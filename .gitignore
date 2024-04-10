@@ -1,0 +1,11 @@
+# ignore all __pycache__
+__pycache__/
+
+# ignore all .env
+*.env
+
+# ignore all .vscode
+*.vscode
+
+# ignore nohup.out
+nohup.out
