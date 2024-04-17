@@ -4,6 +4,7 @@ import requests
 import unicodedata
 from datetime import datetime, timedelta, UTC
 import pymysql
+import sys
 import os
 import re
 import boto3
@@ -19,12 +20,29 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait  
 from selenium.common.exceptions import ElementNotInteractableException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
+from logging.handlers import TimedRotatingFileHandler
 
+# # to produce log
+# logger = logging.getLogger(__name__)
+# logger.setLevel(logging.DEBUG)
+
+# handler = TimedRotatingFileHandler(filename='example.log', when='midnight', interval=1, backupCount=7)
+# formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+# handler.setFormatter(formatter)
+# logger.addHandler(handler)
+
+# logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+# logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+# to start crawling
 headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}
 
 # to prevent ERROR:cert_issuer_source_aia.cc(35)
 options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
+# can't be headless, will be blocked
+# options.add_argument('--headless')
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 # blockchain SWE
@@ -115,6 +133,7 @@ def get_job(job_id):
 
     job_title = data['data']['header']['jobName']
     company_name = data['data']['header']['custName']
+    # only 3 characters? 
     job_location = data['data']['jobDetail']['addressArea']
     salary_info = data['data']['jobDetail']['salary']
     min_salary = data['data']['jobDetail']['salaryMin']
@@ -127,7 +146,8 @@ def get_job(job_id):
             skills = str(item['description'])
         else:
             skills += "," + str(item['description'])
-    travel = data['data']['jobDetail']['businessTrip']
+    if data['data']['jobDetail']['businessTrip'] != None:
+        travel = data['data']['jobDetail']['businessTrip']
     management = data['data']['jobDetail']['manageResp']
     if data['data']['jobDetail']['remoteWork'] != None:
         remote = '可遠端工作'
@@ -218,20 +238,21 @@ s3 = boto3.client("s3",
     aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
 BUCKET_NAME = os.getenv("S3_BUCKET")
 
-# # Connect to MySQL database
-# db_mysql_conn = pymysql.connect(host=os.getenv("MYSQL_HOST"),
-#                                 user=os.getenv("MYSQL_USER"),
-#                                 password=os.getenv("MYSQL_PASSWORD"),
-#                                 database=os.getenv("MYSQL_DB"),
-#                                 charset='utf8mb4',
-#                                 cursorclass=pymysql.cursors.DictCursor)
-
-db_mysql_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
-                                user=os.getenv("RDS_USER"),
-                                password=os.getenv("RDS_PASSWORD"),
-                                database=os.getenv("RDS_DB"),
+# Connect to MySQL database
+db_mysql_conn = pymysql.connect(host=os.getenv("MYSQL_HOST"),
+                                user=os.getenv("MYSQL_USER"),
+                                password=os.getenv("MYSQL_PASSWORD"),
+                                database=os.getenv("MYSQL_DB"),
                                 charset='utf8mb4',
                                 cursorclass=pymysql.cursors.DictCursor)
+
+# # Connect to AWS RDS
+# db_mysql_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
+#                                 user=os.getenv("RDS_USER"),
+#                                 password=os.getenv("RDS_PASSWORD"),
+#                                 database=os.getenv("RDS_DB"),
+#                                 charset='utf8mb4',
+#                                 cursorclass=pymysql.cursors.DictCursor)
 
 cursor = db_mysql_conn.cursor()
 
@@ -257,6 +278,9 @@ print(result)
 #     jd, jd_s3 = get_job(j_code)
 #     insert_sql(jd)
 #     time.sleep(1)
+
+job_malay = get_job("889kc")
+print(job_malay)
 
 db_mysql_conn.close()
 driver.quit()
