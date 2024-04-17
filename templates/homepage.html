@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Search</title>
+    <style>
+        .job {
+            display: inline-block;
+            width: 600px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <form action="/search" method="POST">
+        <input type="text" name="job_title" placeholder="Job Title">
+        <input type="text" name="salary" placeholder="Salary">
+        <input type="text" name="location" placeholder="Location">
+        <button type="submit">Search</button>
+    </form>
+
+    {% if results %}
+    <h2>Search Results</h2>
+    {% for job in results %}
+    <div class="job">
+        <h3>{{ job.job_title }}</h3>
+        <p>Company: {{ job.company_name }}</p>
+        <p>Location: {{ job.job_location }}</p>
+        <p>Salary: {{ job.salary_period }}</p>
+        <p>Source: {{ job.job_source }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+</body>
+</html>
