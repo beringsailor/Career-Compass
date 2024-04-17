@@ -89,6 +89,7 @@ def get_job(url):
     travel = None
     edu_level = None
     skills = None
+    remote = None
 
     # Get the page source
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -119,7 +120,8 @@ def get_job(url):
                         job_location = following_div.text
                     elif name == "職務類別":
                         following_div = job_item_name.find_element(By.XPATH, "following-sibling::div[1]")
-                        job_category = following_div.text
+                        job_category_text = following_div.text
+                        job_category = job_category_text.split('、')
                     elif name == "工作經驗":
                         following_div = job_item_name.find_element(By.XPATH, "following-sibling::div[1]")
                         work_experience = following_div.text
@@ -135,25 +137,33 @@ def get_job(url):
                     elif name == "電腦專長":
                         following_div = job_item_name.find_element(By.XPATH, "following-sibling::div[1]")
                         skills = following_div.text
-                        skills = re.split(r'[、,]', skills)
                     
         except NoSuchElementException:
             break  # Exit the loop if the "Next Page" button is not found
     
-    job_info = [job_title, company_name, salary, job_location, job_category, work_experience, management, travel, edu_level, skills]
+    job_info = [job_title, company_name, job_location, salary,\
+                edu_level, work_experience, skills, travel, \
+                management, remote, job_category]
+    
+    # job_info = [job_title, company_name, job_location, salary_info, min_salary, \
+    #             max_salary, edu_level, work_experience, skills, travel, \
+    #             management, remote, job_category]
+
     return job_info
 
-j_links = crawl_all_pages(driver)
-print(len(j_links))
+job = get_job("https://www.518.com.tw/job-LXb23W.html")
+print(job)
 
-job_details = []
-for j_link in j_links:
-    jd = get_job(j_link)
-    job_details.append(jd)
-    time.sleep(random.uniform(1, 3))
-    
+# j_links = crawl_all_pages(driver)
+# print(len(j_links))
 
-print(job_details)
-print(len(job_details))
+# job_details = []
+# for j_link in j_links:
+#     jd = get_job(j_link)
+#     job_details.append(jd)
+#     time.sleep(random.uniform(1, 3))
+
+# print(job_details)
+# print(len(job_details))
 
 driver.quit()

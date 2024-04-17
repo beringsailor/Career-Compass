@@ -1,0 +1,21 @@
+[
+    {
+        "job_title": "AI\u7814\u767c\u5de5\u7a0b\u5e2b",
+        "company_name": "\u5340\u584a\u79d1\u6280\u80a1\u4efd\u6709\u9650\u516c\u53f8",
+        "job_location": "\u53f0\u5317\u5e02",
+        "salary_info": "\u6708\u85aa50,000~75,000\u5143",
+        "min_salary": 50000,
+        "max_salary": 75000,
+        "edu_level": "\u5c08\u79d1\u4ee5\u4e0a",
+        "work_experience": "1\u5e74\u4ee5\u4e0a",
+        "skills": "Linux,Git,Java,Python",
+        "travel": "\u7121\u9700\u51fa\u5dee\u5916\u6d3e",
+        "management": "\u4e0d\u9700\u8ca0\u64d4\u7ba1\u7406\u8cac\u4efb",
+        "remote": "\u4e0d\u53ef\u9060\u7aef\u5de5\u4f5c",
+        "job_category": [
+            "\u8edf\u9ad4\u5de5\u7a0b \u5e2b",
+            "\u5168\u7aef\u5de5\u7a0b\u5e2b",
+            "\u5340\u584a\u93c8\u5de5\u7a0b\u5e2b"
+        ]
+    }
+]

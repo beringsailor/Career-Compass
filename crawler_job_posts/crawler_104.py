@@ -2,8 +2,14 @@ import time
 import random
 import requests
 import unicodedata
+from datetime import datetime, timedelta, UTC
+import pymysql
+import os
 import re
+import boto3
 import logging
+import json
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service 
 from selenium.webdriver.chrome.options import Options
@@ -22,10 +28,11 @@ options.add_experimental_option('excludeSwitches', ['enable-logging'])
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 # blockchain SWE
-driver.get("https://www.104.com.tw/jobs/search/?jobcat=2007001023")
+# driver.get("https://www.104.com.tw/jobs/search/?jobcat=2007001023")
+driver.get("https://www.104.com.tw/jobs/search/?jobcat=2007001022")
 
 # crawl job_ids of each page
-def crawl_each_page(driver):
+def crawl_id_each_page(driver):
     job_codes_per_page = []
 
     try:
@@ -46,17 +53,17 @@ def crawl_each_page(driver):
                     logging.warning("No job code found for post: %s", post.text)
     except StaleElementReferenceException:
         # Retry if a stale element reference exception occurs
-        return crawl_each_page(driver)
+        return crawl_id_each_page(driver)
     
     return job_codes_per_page
 
 # crawl through multiple pages
-def crawl_all_pages(driver):
+def crawl_id_all_pages(driver):
     all_job_codes = []
 
     while True:
         # Extract job codes from the current page
-        job_codes_per_page = crawl_each_page(driver)
+        job_codes_per_page = crawl_id_each_page(driver)
         all_job_codes.extend(job_codes_per_page)
 
         try:
@@ -65,7 +72,7 @@ def crawl_all_pages(driver):
             driver.execute_script("arguments[0].scrollIntoView(true);", next_button)
             next_button.click() 
             
-            job_codes_per_page = crawl_each_page(driver)
+            job_codes_per_page = crawl_id_each_page(driver)
             all_job_codes.extend(job_codes_per_page)
 
             # Wait for the next page to load
@@ -115,12 +122,13 @@ def get_job(job_id):
     edu_level = data['data']['condition']['edu']
     work_experience = data['data']['condition']['workExp']
     # iterate for multiple skills
-    skills = []
     for item in data['data']['condition']['specialty']:
-        skills.append(item['description'])
+        if skills is None:
+            skills = str(item['description'])
+        else:
+            skills += "," + str(item['description'])
     travel = data['data']['jobDetail']['businessTrip']
     management = data['data']['jobDetail']['manageResp']
-    remote = []
     if data['data']['jobDetail']['remoteWork'] != None:
         remote = '可遠端工作'
     else:
@@ -132,28 +140,123 @@ def get_job(job_id):
     
     job_info = [job_title, company_name, job_location, salary_info, min_salary, \
                 max_salary, edu_level, work_experience, skills, travel, \
-                management, remote ,job_category]
+                management, remote, job_category]
+    
+    # job_info_s3 = {
+    # 'job_title': job_title, 
+    # 'company_name': company_name, 
+    # 'job_location': job_location, 
+    # 'salary_info': salary_info, 
+    # 'min_salary': min_salary, 
+    # 'max_salary': max_salary, 
+    # 'edu_level': edu_level, 
+    # 'work_experience': work_experience, 
+    # 'skills': skills, 
+    # 'travel': travel,
+    # 'management': management, 
+    # 'remote': remote, 
+    # 'job_category': job_category
+    # }  
 
     # # return data['data']
     # time.sleep(random.uniform(1, 3))
 
     return job_info
 
-all_job_codes = crawl_all_pages(driver)
+# insert each job to database
+def insert_sql(one_job_jd):
+    # get taiwan date when inserting
+    tw_time = datetime.now(UTC) + timedelta(hours=8)
+    tw_date = tw_time.date()
+
+    insert_query = \
+    """""""""
+    INSERT INTO job (job_title, company_name, job_location, salary_period, min_salary, 
+                    max_salary, edu_level, work_experience, skills, travel, 
+                    management, remote, job_source, create_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """""""""
+    cursor.execute(insert_query, (one_job_jd[0], one_job_jd[1], one_job_jd[2], one_job_jd[3], one_job_jd[4], \
+                                    one_job_jd[5], one_job_jd[6], one_job_jd[7], one_job_jd[8], one_job_jd[9], \
+                                    one_job_jd[10], one_job_jd[11], '104', tw_date))
+    db_mysql_conn.commit()
+
+    last_id = cursor.lastrowid
+    for j_category in one_job_jd[12]:
+        insert_query = "INSERT INTO job_category (job_id, job_category) VALUES (%s, %s)"
+        cursor.execute(insert_query, (last_id, j_category))
+
+        db_mysql_conn.commit()
+
+# jd_list to json file
+def list_to_json(input_list):
+    # get taiwan date when inserting
+    tw_time = datetime.now(UTC) + timedelta(hours=8)
+    tw_date = tw_time.date()
+
+    filename = f"jd_104_{tw_date}.json"
+    with open(filename, "w", encoding="utf-8") as json_file:
+        json.dump(input_list, json_file, ensure_ascii=False, indent=4)
+
+    return filename
+
+# upload_s3 for backup
+def upload_to_s3(filename, BUCKET_NAME):
+    try:
+        s3.upload_file(filename, BUCKET_NAME, filename)
+        result = 'uploaded to S3'
+        return result
+    except Exception as e:
+        return {"errors": str(e)}
+
+load_dotenv()
+
+# access s3 bucket
+s3 = boto3.client("s3", 
+    region_name=os.getenv("REGION_NAME"),
+    aws_access_key_id=os.getenv("S3_KEY"),
+    aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
+BUCKET_NAME = os.getenv("S3_BUCKET")
+
+# # Connect to MySQL database
+# db_mysql_conn = pymysql.connect(host=os.getenv("MYSQL_HOST"),
+#                                 user=os.getenv("MYSQL_USER"),
+#                                 password=os.getenv("MYSQL_PASSWORD"),
+#                                 database=os.getenv("MYSQL_DB"),
+#                                 charset='utf8mb4',
+#                                 cursorclass=pymysql.cursors.DictCursor)
+
+db_mysql_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
+                                user=os.getenv("RDS_USER"),
+                                password=os.getenv("RDS_PASSWORD"),
+                                database=os.getenv("RDS_DB"),
+                                charset='utf8mb4',
+                                cursorclass=pymysql.cursors.DictCursor)
+
+cursor = db_mysql_conn.cursor()
+
+all_job_codes = crawl_id_all_pages(driver)
 print("Total job codes:", len(all_job_codes))
 
 all_jds = []
 for j_code in all_job_codes:
     jd = get_job(j_code)
-    all_jds.append(jd)
+    insert_sql(jd)
 
+    all_jds.append(jd)
     time.sleep(1)
 
-print("Total job descriptions:", len(all_jds))
-print(all_jds)
+all_jd_filename = list_to_json(all_jds)
+result = upload_to_s3(all_jd_filename, BUCKET_NAME)
+print(result)
 
-# # example job pages
-# get_job("87448")
-# get_job("6kw77")
+#     time.sleep(1)
+# print('got all jd')
 
+# for j_code in all_job_codes:
+#     jd, jd_s3 = get_job(j_code)
+#     insert_sql(jd)
+#     time.sleep(1)
+
+db_mysql_conn.close()
 driver.quit()

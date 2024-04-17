@@ -65,7 +65,9 @@ def crawl_jobs(driver):
 # print("Total job codes:", len(job_codes))
 
 def get_job():
-    driver.get("https://www.1111.com.tw/job/113081067/")
+    # driver.get("https://www.1111.com.tw/job/113081067/")
+    # driver.get("https://www.1111.com.tw/job/112993204/")
+    driver.get("https://www.1111.com.tw/job/91524616/")
 
     # set default results
     job_title = None
@@ -74,10 +76,11 @@ def get_job():
     job_location = None
     job_category = None
     work_experience = None
-    management = None
-    travel = None
     edu_level = None
     skills = None
+    management = None
+    travel = None
+    remote = None
 
     head = WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.ui_job_detail")))
     job_title_ele = head.find_element(By.CSS_SELECTOR,"div.header_title_fixed")
@@ -87,18 +90,57 @@ def get_job():
     company_ele = company_div.find_element(By.CSS_SELECTOR,"span.title_7")
     company_name = company_ele.text
 
+    # 工作資訊
     work_info_div = driver.find_element(By.CSS_SELECTOR, "div.content_items.job_info")
 
     salary_ele = work_info_div.find_element(By.CSS_SELECTOR, "span.job_info_content.color_Secondary_1")
     salary = salary_ele.text
 
+    divs = work_info_div.find_elements(By.CSS_SELECTOR, "span.job_info_title")
+    for div in divs:
+        if div.text.strip() == "遠距工作：":
+            remote_div = div.find_element(By.XPATH, "./following-sibling::span[1]")
+            remote = remote_div.text
+
     job_location_div = work_info_div.find_element(By.CSS_SELECTOR, "div.job_info_icon.icon_location")
     next_div = job_location_div.find_element(By.XPATH, "./following-sibling::div[1]")
-    job_location_ele = next_div.find_elements(By.CSS_SELECTOR, "span.job_info_content")
-    for j in job_location_ele:
-        print(j )
+    job_location_ele = next_div.find_element(By.CSS_SELECTOR, "span.job_info_content")
+    job_location = job_location_ele.text
 
-    job_info = [job_title, company_name, salary, job_location]
+    job_category = []
+    job_category_div = work_info_div.find_element(By.CSS_SELECTOR, "span.job_info_content.btn-group")
+    job_location_ele = job_category_div.find_elements(By.TAG_NAME, "u")
+    for j_category in job_location_ele:
+        job_category.append(j_category.text)
+    
+    # 要求條件
+    work_exp_divs = driver.find_elements(By.CSS_SELECTOR, "div.content_items.job_skill span.job_info_title")
+    for div in work_exp_divs: 
+        spec_title = div.text
+
+        if spec_title == "工作經驗：":
+            following_div = div.find_element(By.XPATH, "following-sibling::span[1]")
+            work_experience = following_div.text
+        elif spec_title == "學歷限制：":
+            following_div = div.find_element(By.XPATH, "following-sibling::span[1]")
+            edu_level = following_div.text
+        elif spec_title == "電腦專長：":
+            following_div = div.find_element(By.XPATH, "following-sibling::span[1]")
+            skill_divs = following_div.find_elements(By.TAG_NAME, "a")
+            for div in skill_divs:
+                if skills == None:
+                    skills = str(div.text)
+                else:
+                    skills += "," + str(div.text)
+
+    job_info = [job_title, company_name, job_location, salary,  \
+                work_experience, edu_level, skills, travel, 
+                management, remote, job_category]
+    
+    # job_info = [job_title, company_name, job_location, salary_info, min_salary, \
+    #             max_salary, edu_level, work_experience, skills, travel, \
+    #             management, remote, job_category]
+    
     print(job_info)
 
 get_job()
