@@ -9,3 +9,6 @@ __pycache__/
 
 # ignore nohup.out
 nohup.out
+
+# ignore .log
+*.log
