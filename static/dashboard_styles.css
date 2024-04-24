@@ -1,0 +1,81 @@
+/* headerbar */
+.top-bar {
+    margin: 0;
+    padding: 5px 25px;
+    background-color: #eeeeee;
+}
+.second-bar {
+    margin: 0;
+    padding: 5px 25px;
+    background-color: #aaaaaa;
+}
+.container-top, .container-second, .nav {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+.item {
+    list-style-type: none;
+    flex-direction: row;
+    text-align: left;
+    margin: 0 1em;
+}
+.searchbar {
+    flex-direction: row;
+    text-align: left;
+    margin: 0 1em;
+    padding: 10px 20px;
+    justify-content: space-between;
+}
+.item a {
+    text-decoration: underline;
+}
+
+/* dashboard */
+img {
+    max-width: 320px;
+    max-height: 200px;
+}
+
+#select-dashboard {
+    margin: 0;
+    padding: 5px 25px;
+    background-color: #aaaaaa;
+}
+
+.flex-container {
+    padding: 5px 25px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* #region-chart, 
+#edu-chart,
+#category-chart,
+#ratio-chart {
+    flex: 1;
+    margin: 10px;
+    border: 2px solid gray;
+} */
+
+.chart {
+    flex: 1;
+    margin: 10px;
+    border: 2px solid gray;
+    overflow: hidden; /* Hide any content that overflows the container */
+    position: relative; /* Ensure proper positioning of the content */
+}
+
+.chart img {
+    width: 100%; /* Make the content fill its container */
+    height: 100%; /* Make the content fill its container */
+    object-fit: contain; /* Ensure the content is visible within the container */
+    position: absolute; /* Position the content within its container */
+    top: 0; /* Align the content to the top */
+    left: 0; /* Align the content to the left */
+}
+
+

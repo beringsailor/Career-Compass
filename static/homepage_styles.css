@@ -1,0 +1,31 @@
+.top-bar {
+    margin: 0;
+    padding: 5px 25px;
+    background-color: #eeeeee;
+}
+.second-bar {
+    margin: 0;
+    padding: 5px 25px;
+    background-color: #aaaaaa;
+}
+.container-top, .container-second {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+.item {
+    flex-direction: row;
+    text-align: left;
+    margin: 0 1em;
+}
+.searchbar {
+    flex-direction: row;
+    text-align: left;
+    margin: 0 1em;
+    padding: 10px 20px;
+    justify-content: space-between;
+}
+.item a {
+    text-decoration: underline;
+}
