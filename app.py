@@ -254,7 +254,7 @@ def get_vacancy_ratio():
             chose_cat.append(day_post['chose_cat'])
             date = day_post['date'].strftime('%Y-%m-%d')
             dates.append(date)
-
+            
         return jsonify({'others': others, 'chose_cat': chose_cat, 'dates': dates})
     
     except Exception as e:

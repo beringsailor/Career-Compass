@@ -198,15 +198,15 @@
             })
             .then(data => {
                 console.log('Response from /api/dashboard/job_vacancy:', data);
-                updateJobRatioBarChart(data.chose_cat, data.others, data.dates);
+                updateJobRatioBarChart(keyword, data.chose_cat, data.others, data.dates);
             })
             .catch(error => console.error('Error:', error));
         }
 
-        function updateJobRatioBarChart(chose_cat, others, dates) {
+        function updateJobRatioBarChart(keyword, chose_cat, others, dates) {
             const data1 = {
                 type: 'bar',
-                name: 'Chosen Category',
+                name: keyword ? String(keyword) : 'All Jobs',
                 x: dates,
                 y: chose_cat,
             };
