@@ -1,36 +1,99 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Search</title>
-    <style>
-        .job {
-            display: inline-block;
-            width: 600px;
-            margin: 10px;
-        }
-    </style>
-</head>
-<body>
-    <form action="/search" method="POST">
-        <input type="text" name="job_title" placeholder="Job Title">
-        <input type="text" name="salary" placeholder="Salary">
-        <input type="text" name="location" placeholder="Location">
-        <button type="submit">Search</button>
-    </form>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Career Compass</title>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='homepage_styles.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
+    </head>
+    <body>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <header>
+            <nav class="top-bar">
+                <div class="container-top">
+                    <a href="{{ url_for('homepage') }}">
+                        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100" height="43">
+                    </a>
+                    <ul class="nav item_ul">
+                        <li class="item">搜尋職缺</li>
+                        <li class="item">
+                            <a href="{{ url_for('dashboard') }}">職業觀測站</a>
+                        </li>
+                        <li class="item">登入</li>
+                        <li class="item">註冊</li>
+                    </ul>
+                </div>
+            </nav>
+        </header>
+        
+        <div class="second-bar">
+            <div class="container-second">
+                <div class="searchbar">
+                    <form class="item_ul" action="/job/search" method="POST">
+                        <input class="item" type="text" name="job_title" placeholder="Job Title" value="{{ job_title }}">
+                        <input class="item" type="text" name="salary" placeholder="Salary" value="{{ salary }}">
+                        <input class="item" type="text" name="location" placeholder="Location" value="{{ location }}">
+                        <button class="item" type="submit">Search</button>
+                    </form>
+                </div>
+            </div>
+        </div>        
 
-    {% if results %}
-    <h2>Search Results</h2>
-    {% for job in results %}
-    <div class="job">
-        <h3>{{ job.job_title }}</h3>
-        <p>Company: {{ job.company_name }}</p>
-        <p>Location: {{ job.job_location }}</p>
-        <p>Salary: {{ job.salary_period }}</p>
-        <p>Source: {{ job.job_source }}</p>
-    </div>
-    {% endfor %}
-    {% endif %}
-</body>
+        <div class="container d-flex justify-content-center mt-50 mb-50">   
+            <div class="row">
+                <div class="col-md-10">
+                    {% if results %}
+                    <h2>Search Results</h2>
+                    {% for job in results %}
+                    <div class="card card-body mt-3">
+                        <div class="media align-items-center align-items-lg-start text-center text-lg-left flex-column flex-lg-row">
+                            <div class="job mr-2 mb-3 mb-lg-0">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/4812/4812244.png" width="150" height="150" alt="">
+                            </div>
+
+                            <div class="media-body">
+                                <h4 class="media-title font-weight-semibold">
+                                    <a href="{{ url_for('get_jd', job_code=job.job_code) }}">
+                                        {{ job.job_title }}
+                                    </a>
+                                </h4>
+
+                                <!-- remove a tag -->
+                                <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
+                                    <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.company_name }}</a></li>
+                                </ul>
+
+                                <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
+                                    <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.job_location }}</a></li>
+                                </ul>
+
+                                <p class="mb-3">{{ job.salary_period }}</p>
+
+                                <ul class="list-inline list-inline-dotted mb-0">
+                                    <li class="list-inline-item"><a href="{{ job.job_source }}" class="text-muted" data-abc="true">職缺詳細</a></li>
+                                    <li class="list-inline-item">Add to <a href="#" data-abc="true">wishlist</a></li>
+                                </ul>
+                            </div>
+
+                            <div class="mt-3 mt-lg-0 ml-lg-3 text-center">
+                                <button type="button" class="btn btn-warning mt-4 text-white"><i class="icon-cart-add mr-2"></i> Add to list</button>
+                            </div>
+                        </div>
+                    </div> 
+                    {% endfor %}
+                    {% endif %}
+                </div>
+                <div class="col-md-10">
+                    {% if pages %}
+                    {% for page in pages  %}
+                    {% endfor %}
+                    {% endif %}
+                </div>               
+            </div>
+        </div>
+    </body>
 </html>
