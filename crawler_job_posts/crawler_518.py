@@ -2,7 +2,11 @@ import time
 import random
 import requests
 import re
+import os
+import pymysql
 import logging
+from datetime import datetime, timedelta, UTC
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service 
 from selenium.webdriver.chrome.options import Options
@@ -153,6 +157,41 @@ def get_job(url):
 
 job = get_job("https://www.518.com.tw/job-LXb23W.html")
 print(job)
+
+load_dotenv()
+
+db_mysql_conn = pymysql.connect(host=os.getenv("MYSQL_HOST"),
+                                user=os.getenv("MYSQL_USER"),
+                                password=os.getenv("MYSQL_PASSWORD"),
+                                database=os.getenv("MYSQL_DB"),
+                                charset='utf8mb4',
+                                cursorclass=pymysql.cursors.DictCursor)
+
+cursor = db_mysql_conn.cursor()
+
+def insert_sql(one_job_jd):
+    # get taiwan date when inserting
+    tw_time = datetime.now(UTC) + timedelta(hours=8)
+    tw_date = tw_time.date()
+
+    insert_query = \
+    """""""""
+    INSERT INTO job (job_title, company_name, job_location, salary_period, min_salary, 
+                    max_salary, edu_level, work_experience, skills, travel, 
+                    management, remote, job_source, create_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """""""""
+    cursor.execute(insert_query, (one_job_jd[0], one_job_jd[1], one_job_jd[2], one_job_jd[3], 0, \
+                                    0, one_job_jd[6], one_job_jd[7], one_job_jd[8], one_job_jd[9], \
+                                    one_job_jd[10], one_job_jd[11], '518', tw_date))
+    db_mysql_conn.commit()
+
+    last_id = cursor.lastrowid
+    for j_category in one_job_jd[12]:
+        insert_query = "INSERT INTO job_category (job_id, job_category) VALUES (%s, %s)"
+        cursor.execute(insert_query, (last_id, j_category))
+
+        db_mysql_conn.commit()
 
 # j_links = crawl_all_pages(driver)
 # print(len(j_links))
