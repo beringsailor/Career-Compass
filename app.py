@@ -9,14 +9,21 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 from hashlib import sha256
 from dotenv import load_dotenv
+from functools import wraps
 from wordcloud import WordCloud
-from flask import render_template, send_file, jsonify, make_response, request
+from flask import render_template, send_file, jsonify, make_response, request, flash, redirect, url_for
 # from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
+load_dotenv()
+
 server = flask.Flask(__name__)
+server.secret_key = os.getenv("SECRET_KEY")
 server.json.ensure_ascii = False
 
-load_dotenv()
+# get jwt token info
+SECRET = os.getenv("SECRET")
+ALGORITHM = os.getenv("ALGORITHM")
+
 # Connect to AWS RDS
 def connect_db():
     db_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
@@ -34,21 +41,83 @@ cursor = conn.cursor()
 SECRET = os.getenv("SECRET")
 ALGORITHM = os.getenv("ALGORITHM")
 
-@server.route('/', methods=['GET', 'POST'])
-def homepage():
-    return render_template('homepage.html')
+def login_required(view_func):
+    @wraps(view_func)
+    def decorated_function(*args, **kwargs):
+        access_token = request.cookies.get('access_token')
+        if not access_token:
+            flash('You need to log in first.', 'error')
+            return redirect(url_for('login'))  # Assuming you have a login route named 'login'
+        
+        try:
+            payload = jwt.decode(access_token.split(' ')[1], SECRET, algorithms=[ALGORITHM])
+            user_id = payload.get('user_id')
+            if not user_id:
+                raise jwt.InvalidTokenError("Invalid token")
+        except jwt.ExpiredSignatureError:
+            flash('Session Timeout. Please log in again.', 'error')
+            return redirect(url_for('get_login_page'))
+        except (jwt.InvalidTokenError, jwt.DecodeError):
+            flash('Invalid token. Please log in again.', 'error')
+            return redirect(url_for('get_login_page'))
+        
+        # You can pass the user_id to the view function if needed
+        return view_func(user_id, *args, **kwargs)
+    
+    return decorated_function
+
+@server.route('/', methods=['GET','POST'])
+@login_required
+def homepage(user_id):
+    conn = connect_db()
+    cursor = conn.cursor()
+    # Example of different content based on login status
+    if user_id:
+        query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
+                    FROM job WHERE 1=1 ORDER BY RAND() LIMIT 10;"
+        cursor.execute(query)
+        recommends = cursor.fetchall()
+
+        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
+        account = cursor.fetchall()
+        name = account[0]['name']
+        conn.close()
+        
+        return render_template('homepage.html', recommends=recommends, name=name)
+    else:
+        query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
+                    FROM job WHERE 1=1 ORDER BY RAND() LIMIT 10;"
+        cursor.execute(query)
+        recommends = cursor.fetchall()
+        conn.close()
+
+        return render_template('homepage.html', recommends=recommends)
 
 # fix paging and others
 @server.route('/job/search', methods=['GET','POST'])
-def search_jobs():
+@login_required
+def search_jobs(user_id): 
+    conn = connect_db()
+    cursor = conn.cursor()
+    if user_id:
+        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
+        account = cursor.fetchall()
+        name = account[0]['name']
+
+        bookmarked = cursor.execute('SELECT * FROM user_bookmark WHERE user_id = %s', (user_id,))
+        bookmarked = cursor.fetchall()
+        bookmarked_list = []
+        for b in bookmarked:
+            bookmarked_list.append(b['job_code'])
+
+        # Fetch user ID
+        user_id = user_id
+    
     if request.method == 'POST':
         job_title = request.form['job_title']
         salary = request.form['salary']
         location = request.form['location']
         page = request.args.get('page', default=1, type=int)
-
-        conn = connect_db()
-        cursor = conn.cursor()
 
         query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code FROM job WHERE 1=1"
         params = []
@@ -73,16 +142,40 @@ def search_jobs():
 
         cursor.execute(query, params)
         results = cursor.fetchall()
+
         conn.close()
 
         # send back the results, page situation, and searched params
-        return render_template('homepage.html', results=results, page=page, \
-                                job_title=job_title, salary=salary, location=location)
+        return render_template('homepage.html', name=name, results=results, page=page, \
+                                job_title=job_title, salary=salary, location=location, \
+                                bookmarked_list=bookmarked_list, user_id=user_id)
 
-@server.route('/searchui', methods=['GET'])
-def ui():
-    return render_template('job_content.html')
+@server.route('/bookmark/<user_id>/<job_code>', methods=['GET'])
+@login_required
+def check_bookmark(uid_decorator, user_id, job_code):
+    conn = connect_db()
+    cursor = conn.cursor()
+    if user_id:
+        # Check if the post is already in the favorite list
+        cursor.execute('SELECT * FROM user_bookmark WHERE job_code=%s AND user_id=%s', (job_code,user_id,))
+        post_in_list = cursor.fetchall()
 
+        if post_in_list:
+            # If the post is already in the list, remove it
+            cursor.execute('DELETE FROM user_bookmark WHERE job_code=%s AND user_id=%s', (job_code,user_id,))
+            action = 'remove'
+        else:
+            # If the post is not in the list, add it
+            cursor.execute('INSERT INTO user_bookmark (job_code, user_id) VALUES (%s, %s)', (job_code,user_id,))
+            action = 'add'
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'action': action})
+
+# need to add return results for recommended jobs
 @server.route('/job/<job_code>', methods=['GET'])
 def get_jd(job_code):
     if job_code:
@@ -105,7 +198,8 @@ def signup():
     if request.method == 'POST':
         email = request.form['email']
         if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
-            return "<h2>Invalid email format</h2>"
+            message_signup = "Invalid email format"
+            return render_template('login.html', message_signup=message_signup)
         conn = connect_db()
         if conn:
             cursor = conn.cursor()
@@ -118,7 +212,8 @@ def signup():
 
                 mail_exist = cursor.execute('SELECT * FROM user WHERE email=%s', email)
                 if mail_exist:
-                    return "email account already exists!"
+                    message_signup = "email account already exists!"
+                    return render_template('login.html', message_signup=message_signup)
                 else:
                     cursor.execute('INSERT INTO user (name, email, password) \
                                     VALUES (%s, %s, %s)', (name, email, hashed_pw))
@@ -134,29 +229,21 @@ def signup():
                     }
                 token = jwt.encode(payload, SECRET, ALGORITHM)
 
-                info = {
-                    "data": {
-                        "access_token": token,
-                        "access_expired": 3600,
-                        "user": response[0]
-                    }
-                }
-                # need to include the data into resp to return json + cookie!!
-                resp = make_response(jsonify(info))
+                resp = make_response(redirect(url_for('homepage')))
+
                 token_bearer = 'Bearer' + ' ' + str(token)
                 resp.set_cookie('access_token', token_bearer)
                 return resp
+            
             except Exception as e:
                 return f"Error occurred: {e}"
-        conn.close()
-    return render_template('signup.html')
+            finally:
+                cursor.close()
+                conn.close()
 
 @server.route('/api/user/signin', methods=['GET','POST']) 
 def signin():
     if request.method == 'POST':
-        email = request.form['email']
-        if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
-            return "<h2>Invalid email format</h2>"
         conn = connect_db()
         if conn:
             cursor = conn.cursor()
@@ -170,30 +257,53 @@ def signin():
                                     FROM user WHERE email=%s AND password=%s', values)
                 account = cursor.fetchall()
                 if not account:
-                    return "Incorrect email or password!"
-
+                    flash('Invalid email or password for signing in', 'signin_error')
+                    message_signin = "Wrong email or password"
+                    return render_template('login.html', message_signin=message_signin)
+                
                 payload = {
                     'user_id':account[0]['id'],
                     'exp' : datetime.now(UTC) + timedelta(seconds=3600)
                     }
                 token = jwt.encode(payload, SECRET, ALGORITHM)
 
-                info = {
-                    "data": {
-                        "access_token": token,
-                        "access_expired": 3600,
-                        "user": account[0]
-                    }
-                }
-                # need to include the data into resp to return json + cookie!!
-                resp = make_response(jsonify(info))
+                resp = make_response(redirect(url_for('homepage')))
+
                 token_bearer = 'Bearer' + ' ' + str(token)
                 resp.set_cookie('access_token', token_bearer)
                 return resp
             except Exception as e:
+                logging.warning(f"Error occurred: {e}")
+                return "There's a problem with the signin process"
+            finally:
+                cursor.close()
+                conn.close()
+
+@server.route('/api/user/profile', methods=['GET']) 
+def profile():
+    if request.method == 'GET':
+        token = request.cookies.get('access_token')
+        if not token:
+            return "No token"
+        else:
+            conn = connect_db()
+            cursor = conn.cursor()
+            try:
+                # Splitting the token to separate the "Bearer" part
+                token_parts = token.split()
+                if len(token_parts) == 2 and token_parts[0] == "Bearer":
+                    payload = jwt.decode(token_parts[1], SECRET, ALGORITHM)
+                    id = payload['user_id']
+                    account = cursor.execute('SELECT name, email  \
+                                        FROM user WHERE id=%s', id)
+                    account = cursor.fetchall()
+                    response = account[0]
+                    return jsonify({"data":response})
+                    # return jsonify(account)
+                else:
+                    return "Wrong token"
+            except Exception as e:
                 return f"Error occurred: {e}"
-        conn.disconnect()
-    return render_template('signin.html')
 
 @server.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():

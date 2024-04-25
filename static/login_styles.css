@@ -1,41 +1,4 @@
-/* element */
-nav {
-    margin: 0;
-    padding: 5px 25px;
-    background-color: #eeeeee;
-}
-/* class */
-.header-container, .item_ul {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-}
-.container-1 {
-    display:flex;
-    flex-direction: column;
-}
-.logo {
-    margin-right: auto;
-}
-.item {
-    list-style-type: none;
-    flex-direction: row;
-    text-align: left;
-    margin: 0 1em;
-}
-.searchbar {
-    display: flex;
-    flex-direction: row;
-    margin: 0;
-    padding: 10px 20px;
-    background-color: #aaaaaa;
-}
-.item a {
-    text-decoration: underline;
-}
 
-/* referenced */
 @import url('https://fonts.googleapis.com/css?family=Montserrat:400,800');
 
 * {

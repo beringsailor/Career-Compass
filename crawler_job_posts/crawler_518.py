@@ -17,6 +17,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 
+load_dotenv()
+
 headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}
 
 # to prevent ERROR:cert_issuer_source_aia.cc(35)
@@ -24,11 +26,8 @@ options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-# app SWE
-driver.get("https://www.518.com.tw/job-index.html?ab=2032001016")
-
-# # all IT jobs
-# driver.get("https://www.518.com.tw/job-index.html?ab=2032001")
+# all IT jobs
+driver.get("https://www.518.com.tw/job-index.html?ab=2032001")
 
 # crawl job_ids of each page
 def crawl_each_page(driver):
@@ -38,7 +37,6 @@ def crawl_each_page(driver):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         posts = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.all_job_hover, div.all_job_hover.new_job")))
 
-        print(len(posts))
         for post in posts:
             h2 = post.find_element(By.CLASS_NAME, "job__title__inner")
             a_tag = h2.find_element(By.TAG_NAME, "a")
@@ -82,7 +80,13 @@ def crawl_all_pages(driver):
 def get_job(url):
     driver.get(url)
 
+    match = re.search(r'job-(\w+)\.html', url)
+    if match:
+        extracted_string = match.group(1)
+        job_code = extracted_string
+    
     # set default results
+    job_code = job_code
     job_title = None
     company_name = None
     salary = None
@@ -94,7 +98,8 @@ def get_job(url):
     edu_level = None
     skills = None
     remote = None
-
+    url_to_518 = url
+    
     # Get the page source
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
     head = WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.headContent")))
@@ -118,7 +123,11 @@ def get_job(url):
                     
                     if name == "薪資待遇":
                         following_div = job_item_name.find_element(By.XPATH, "following-sibling::div[1]")
-                        salary = following_div.text
+                        salary_info = following_div.text
+                        match = re.search(r'月薪 (\d{1,3}(?:,\d{3})*) 至 (\d{1,3}(?:,\d{3})*)', salary_info)
+                        if match:
+                            min_salary = int(match.group(1).replace(",", "")) if match.group(1) else 0
+                            max_salary = int(match.group(2).replace(",", "")) if match.group(2) else 0
                     elif name == "上班地點":
                         following_div = job_item_name.find_element(By.XPATH, "following-sibling::div[1]")
                         job_location = following_div.text
@@ -145,53 +154,61 @@ def get_job(url):
         except NoSuchElementException:
             break  # Exit the loop if the "Next Page" button is not found
     
-    job_info = [job_title, company_name, job_location, salary,\
-                edu_level, work_experience, skills, travel, \
-                management, remote, job_category]
-    
-    # job_info = [job_title, company_name, job_location, salary_info, min_salary, \
-    #             max_salary, edu_level, work_experience, skills, travel, \
-    #             management, remote, job_category]
+    job_info = [job_title, job_code, company_name, job_location, salary_info, \
+                min_salary, max_salary, edu_level, work_experience, skills, \
+                travel, management, remote, url_to_518, job_category]
 
     return job_info
 
-job = get_job("https://www.518.com.tw/job-LXb23W.html")
-print(job)
-
-load_dotenv()
-
-db_mysql_conn = pymysql.connect(host=os.getenv("MYSQL_HOST"),
-                                user=os.getenv("MYSQL_USER"),
-                                password=os.getenv("MYSQL_PASSWORD"),
-                                database=os.getenv("MYSQL_DB"),
-                                charset='utf8mb4',
-                                cursorclass=pymysql.cursors.DictCursor)
-
-cursor = db_mysql_conn.cursor()
-
-def insert_sql(one_job_jd):
+def insert_sql(one_jd):
     # get taiwan date when inserting
     tw_time = datetime.now(UTC) + timedelta(hours=8)
     tw_date = tw_time.date()
 
-    insert_query = \
-    """""""""
-    INSERT INTO job (job_title, company_name, job_location, salary_period, min_salary, 
-                    max_salary, edu_level, work_experience, skills, travel, 
-                    management, remote, job_source, create_date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """""""""
-    cursor.execute(insert_query, (one_job_jd[0], one_job_jd[1], one_job_jd[2], one_job_jd[3], 0, \
-                                    0, one_job_jd[6], one_job_jd[7], one_job_jd[8], one_job_jd[9], \
-                                    one_job_jd[10], one_job_jd[11], '518', tw_date))
-    db_mysql_conn.commit()
+    db_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
+                            user=os.getenv("RDS_USER"),
+                            password=os.getenv("RDS_PASSWORD"),
+                            database=os.getenv("RDS_DB"),
+                            charset='utf8mb4',
+                            cursorclass=pymysql.cursors.DictCursor)
+    cursor = db_conn.cursor()
 
-    last_id = cursor.lastrowid
-    for j_category in one_job_jd[12]:
-        insert_query = "INSERT INTO job_category (job_id, job_category) VALUES (%s, %s)"
-        cursor.execute(insert_query, (last_id, j_category))
+    insert_query = """
+        INSERT INTO job (job_title, job_code, company_name, job_location, salary_period, 
+                        min_salary, max_salary, edu_level, work_experience, skills, 
+                        travel, management, remote, job_source, create_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                        job_title = VALUES(job_title),
+                        company_name = VALUES(company_name),
+                        job_location = VALUES(job_location),
+                        salary_period = VALUES(salary_period),
+                        min_salary = VALUES(min_salary),
+                        max_salary = VALUES(max_salary),
+                        edu_level = VALUES(edu_level),
+                        work_experience = VALUES(work_experience),
+                        skills = VALUES(skills),
+                        travel = VALUES(travel),
+                        management = VALUES(management),
+                        remote = VALUES(remote),
+                        job_source = VALUES(job_source),
+                        create_date = VALUES(create_date)
+    """
 
-        db_mysql_conn.commit()
+    job_data = [one_jd[0],one_jd[1],one_jd[2],one_jd[3],one_jd[4], \
+                one_jd[5],one_jd[6],one_jd[7],one_jd[8],one_jd[9], \
+                one_jd[10],one_jd[11],one_jd[12],one_jd[13],tw_date]
+    
+    # Execute the bulk insert
+    cursor.execute(insert_query, job_data)
+    db_conn.commit()
+
+    # Prepare the query for bulk insertion for job categories
+    category_query = "INSERT INTO job_category (job_code, job_category) VALUES (%s, %s)"
+
+    for j_category in one_jd[14]:
+        cursor.execute(category_query, (one_jd[1], j_category))
+        db_conn.commit()
 
 # j_links = crawl_all_pages(driver)
 # print(len(j_links))
@@ -204,5 +221,9 @@ def insert_sql(one_job_jd):
 
 # print(job_details)
 # print(len(job_details))
+
+single_jd = get_job("https://www.518.com.tw/job-yBpxwk.html")
+insert_sql(single_jd)
+print(single_jd)
 
 driver.quit()

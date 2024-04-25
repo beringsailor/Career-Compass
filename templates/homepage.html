@@ -8,10 +8,36 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <link rel="stylesheet" href="{{ url_for('static', filename='homepage_styles.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
-    </head>
-    <body>
         <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <script>
+            function toggleBookmark(userId, jobCode) {
+                var bookmarkIcon = document.getElementById('bookmarkIcon-' + jobCode);
+                // Send AJAX request to Flask API
+                fetch('/bookmark/' + userId + '/' + jobCode)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Update icon and text based on response
+                        if (data.action === 'add') {
+                            bookmarkIcon.src = "{{ url_for('static', filename='star_filled.png') }}";
+                            bookmarkIcon.parentNode.querySelector('p').textContent = '已收藏';
+                        } else {
+                            bookmarkIcon.src = "{{ url_for('static', filename='star_empty.png') }}";
+                            bookmarkIcon.parentNode.querySelector('p').textContent = '未收藏';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('There was a problem with the fetch operation:', error);
+                    });
+            }
+        </script>
+    </head>
+    <body>
         <header>
             <nav class="top-bar">
                 <div class="container-top">
@@ -23,8 +49,13 @@
                         <li class="item">
                             <a href="{{ url_for('dashboard') }}">職業觀測站</a>
                         </li>
-                        <li class="item">登入</li>
-                        <li class="item">註冊</li>
+                        <li class="item">
+                            {% if name %}
+                                <a href="{{ url_for('profile') }}" data-userid="{{ user_id }}">{{ name }}</a>
+                            {% else %}
+                                <a href="{{ url_for('get_login_page') }}">登入 / 註冊</a>
+                            {% endif %}
+                        </li>
                     </ul>
                 </div>
             </nav>
@@ -42,7 +73,16 @@
                 </div>
             </div>
         </div>        
-
+        <div>
+            {% if recommends %}
+                {% for recommend in recommends %}
+                    {{ recommend.job_title }}
+                    {{ recommend.company_name }}
+                    {{ recommend.job_location }}
+                    {{ recommend.salary_period }}
+                {% endfor %}
+            {% endif %}
+        </div>
         <div class="container d-flex justify-content-center mt-50 mb-50">   
             <div class="row">
                 <div class="col-md-10">
@@ -80,13 +120,24 @@
                             </div>
 
                             <div class="mt-3 mt-lg-0 ml-lg-3 text-center">
-                                <button type="button" class="btn btn-warning mt-4 text-white"><i class="icon-cart-add mr-2"></i> Add to list</button>
+                                {% if job.job_code in bookmarked_list %}
+                                <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
+                                    <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_filled.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                    <p>已收藏</p>
+                                </a>
+                                {% else %}
+                                <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
+                                    <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                    <p>未收藏</p>
+                                </a>
+                                {% endif %}
                             </div>
                         </div>
-                    </div> 
+                    </div>
                     {% endfor %}
                     {% endif %}
                 </div>
+                <!-- paging buttons -->
                 <div class="col-md-10">
                     {% if pages %}
                     {% for page in pages  %}
@@ -95,5 +146,6 @@
                 </div>               
             </div>
         </div>
+
     </body>
 </html>
