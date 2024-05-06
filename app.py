@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# for line 341
+
 import flask
 import os
 import re
@@ -11,7 +14,7 @@ from hashlib import sha256
 from dotenv import load_dotenv
 from functools import wraps
 from wordcloud import WordCloud
-from flask import render_template, send_file, jsonify, make_response, request, flash, redirect, url_for
+from flask import session, request, render_template, send_file, jsonify, make_response, flash, redirect, url_for
 # from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
 load_dotenv()
@@ -45,60 +48,28 @@ def login_required(view_func):
     @wraps(view_func)
     def decorated_function(*args, **kwargs):
         access_token = request.cookies.get('access_token')
-        if not access_token:
-            flash('You need to log in first.', 'error')
-            return redirect(url_for('login'))  # Assuming you have a login route named 'login'
-        
-        try:
-            payload = jwt.decode(access_token.split(' ')[1], SECRET, algorithms=[ALGORITHM])
-            user_id = payload.get('user_id')
-            if not user_id:
-                raise jwt.InvalidTokenError("Invalid token")
-        except jwt.ExpiredSignatureError:
-            flash('Session Timeout. Please log in again.', 'error')
-            return redirect(url_for('get_login_page'))
-        except (jwt.InvalidTokenError, jwt.DecodeError):
-            flash('Invalid token. Please log in again.', 'error')
-            return redirect(url_for('get_login_page'))
-        
-        # You can pass the user_id to the view function if needed
-        return view_func(user_id, *args, **kwargs)
-    
+        if access_token:
+            try:
+                payload = jwt.decode(access_token.split(' ')[1], SECRET, algorithms=[ALGORITHM])
+                user_id = payload.get('user_id')
+                if user_id:
+                    return view_func(user_id, *args, **kwargs)  # Pass user_id if logged in
+            except jwt.ExpiredSignatureError:
+                flash('Session Timeout. Please log in again.', 'error')
+            except (jwt.InvalidTokenError, jwt.DecodeError):
+                flash('Invalid token. Please log in again.', 'error')
+
+        # If not logged in or token is invalid, proceed without user_id
+        return view_func(None, *args, **kwargs)
+
     return decorated_function
 
 @server.route('/', methods=['GET','POST'])
 @login_required
-def homepage(user_id):
+def homepage(user_id=None):
     conn = connect_db()
     cursor = conn.cursor()
     # Example of different content based on login status
-    if user_id:
-        query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
-                    FROM job WHERE 1=1 ORDER BY RAND() LIMIT 10;"
-        cursor.execute(query)
-        recommends = cursor.fetchall()
-
-        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
-        account = cursor.fetchall()
-        name = account[0]['name']
-        conn.close()
-        
-        return render_template('homepage.html', recommends=recommends, name=name)
-    else:
-        query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
-                    FROM job WHERE 1=1 ORDER BY RAND() LIMIT 10;"
-        cursor.execute(query)
-        recommends = cursor.fetchall()
-        conn.close()
-
-        return render_template('homepage.html', recommends=recommends)
-
-# fix paging and others
-@server.route('/job/search', methods=['GET','POST'])
-@login_required
-def search_jobs(user_id): 
-    conn = connect_db()
-    cursor = conn.cursor()
     if user_id:
         account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
         account = cursor.fetchall()
@@ -109,16 +80,43 @@ def search_jobs(user_id):
         bookmarked_list = []
         for b in bookmarked:
             bookmarked_list.append(b['job_code'])
+    else:
+        name=None
+        bookmarked_list=None
+        
+    query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
+                FROM job WHERE 1=1 ORDER BY RAND() LIMIT 5;"
+    cursor.execute(query)
+    recommends = cursor.fetchall()
+    conn.close()
 
-        # Fetch user ID
-        user_id = user_id
-    
-    if request.method == 'POST':
-        job_title = request.form['job_title']
-        salary = request.form['salary']
-        location = request.form['location']
+    return render_template('homepage.html', recommends=recommends, name=name, user_id=user_id)
+
+@server.route('/job/search', methods=['GET'])
+@login_required
+def search_jobs_get(user_id=None):
+    try:
+        job_title = request.args.get('job_title')
+        salary = request.args.get('salary')
+        location = request.args.get('location')
         page = request.args.get('page', default=1, type=int)
 
+        conn = connect_db()
+        cursor = conn.cursor()
+        if user_id:
+            account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
+            account = cursor.fetchall()
+            name = account[0]['name']
+
+            bookmarked = cursor.execute('SELECT * FROM user_bookmark WHERE user_id = %s', (user_id,))
+            bookmarked = cursor.fetchall()
+            bookmarked_list = []
+            for b in bookmarked:
+                bookmarked_list.append(b['job_code'])
+        else:
+            name = None
+            bookmarked_list = None
+        
         query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code FROM job WHERE 1=1"
         params = []
 
@@ -143,12 +141,20 @@ def search_jobs(user_id):
         cursor.execute(query, params)
         results = cursor.fetchall()
 
-        conn.close()
+        if results == None:
+            word = "no more jobs"
+            return render_template('homepage.html', name=name, page=page, \
+                                    job_title=job_title, salary=salary, location=location, \
+                                    bookmarked_list=bookmarked_list, user_id=user_id)
 
-        # send back the results, page situation, and searched params
+        conn.close()
+        
+        # Render template with search results
         return render_template('homepage.html', name=name, results=results, page=page, \
-                                job_title=job_title, salary=salary, location=location, \
-                                bookmarked_list=bookmarked_list, user_id=user_id)
+                                    job_title=job_title, salary=salary, location=location, \
+                                    bookmarked_list=bookmarked_list, user_id=user_id)
+    except Exception as e:
+        logging.error(f"Error in job search GET request: {e}")
 
 @server.route('/bookmark/<user_id>/<job_code>', methods=['GET'])
 @login_required
@@ -177,23 +183,52 @@ def check_bookmark(uid_decorator, user_id, job_code):
 
 # need to add return results for recommended jobs
 @server.route('/job/<job_code>', methods=['GET'])
-def get_jd(job_code):
+@login_required
+def get_jd(user_id, job_code):
+    conn = connect_db()
+    cursor = conn.cursor()
+    
+    if user_id:
+        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
+        account = cursor.fetchall()
+        name = account[0]['name']
+
+        bookmarked = cursor.execute('SELECT * FROM user_bookmark WHERE user_id = %s', (user_id,))
+        bookmarked = cursor.fetchall()
+        bookmarked_list = []
+        for b in bookmarked:
+            bookmarked_list.append(b['job_code'])
+    else:
+        name = None
+        bookmarked_list = None
+    
     if job_code:
-        conn = connect_db()
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT * FROM job WHERE job_code=%s", (job_code,))
-
+        results = cursor.execute("SELECT * FROM job WHERE job_code=%s", (job_code,))
         results = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT DISTINCT job.job_code AS job_code, job_title, company_name, job_location
+            FROM job_category
+            JOIN job ON job_category.job_code = job.job_code 
+            WHERE job_category IN (
+                SELECT job_category
+                FROM job_category
+                WHERE job_code=%s)
+            AND job.job_code != %s
+            LIMIT 2
+            """, (job_code, job_code,))
+        sides = cursor.fetchall()
+
         conn.close()
 
-        return render_template('job_content.html', results=results)
+    return render_template('job_content.html', results=results, \
+                           sides=sides, name=name, bookmarked_list=bookmarked_list)
 
-@server.route('/login', methods=['GET','POST'])
+@server.route('/user/login', methods=['GET'])
 def get_login_page():
     return render_template('login.html')
 
-@server.route('/api/user/signup', methods=['GET','POST']) 
+@server.route('/api/user/signup', methods=['POST']) 
 def signup():
     if request.method == 'POST':
         email = request.form['email']
@@ -234,14 +269,13 @@ def signup():
                 token_bearer = 'Bearer' + ' ' + str(token)
                 resp.set_cookie('access_token', token_bearer)
                 return resp
-            
             except Exception as e:
-                return f"Error occurred: {e}"
-            finally:
-                cursor.close()
-                conn.close()
+                logging.error("signup error")
 
-@server.route('/api/user/signin', methods=['GET','POST']) 
+        cursor.close()
+        conn.close()
+
+@server.route('/api/user/signin', methods=['POST']) 
 def signin():
     if request.method == 'POST':
         conn = connect_db()
@@ -273,41 +307,52 @@ def signin():
                 resp.set_cookie('access_token', token_bearer)
                 return resp
             except Exception as e:
-                logging.warning(f"Error occurred: {e}")
-                return "There's a problem with the signin process"
+                logging.error("signin error")
             finally:
                 cursor.close()
                 conn.close()
 
-@server.route('/api/user/profile', methods=['GET']) 
-def profile():
-    if request.method == 'GET':
-        token = request.cookies.get('access_token')
-        if not token:
-            return "No token"
-        else:
+@server.route('/user/profile', methods=['GET']) 
+@login_required
+def profile(user_id):
+    if user_id:
+        try:
             conn = connect_db()
             cursor = conn.cursor()
-            try:
-                # Splitting the token to separate the "Bearer" part
-                token_parts = token.split()
-                if len(token_parts) == 2 and token_parts[0] == "Bearer":
-                    payload = jwt.decode(token_parts[1], SECRET, ALGORITHM)
-                    id = payload['user_id']
-                    account = cursor.execute('SELECT name, email  \
-                                        FROM user WHERE id=%s', id)
-                    account = cursor.fetchall()
-                    response = account[0]
-                    return jsonify({"data":response})
-                    # return jsonify(account)
-                else:
-                    return "Wrong token"
-            except Exception as e:
-                return f"Error occurred: {e}"
+            account = cursor.execute("""
+                    SELECT job.job_code as job_code, user.id AS user_id, name , email, job_source,
+                    job_title, company_name AS company, job_location AS location
+                    FROM pp_aws.user
+                    LEFT JOIN user_bookmark ON user.id = user_bookmark.user_id
+                    LEFT JOIN job ON user_bookmark.job_code = job.job_code
+                    WHERE user.id=%s LIMIT 5
+                    """, user_id)
+            account = cursor.fetchall()
+            data = account
+            name = account[0]['name']
+            # return jsonify({"data":data})
+            return render_template('profile.html', data=data, name=name)
+        except Exception as e:
+            logging.error("user profile api error")
 
 @server.route('/dashboard', methods=['GET', 'POST'])
-def dashboard():
-    return render_template('dashboard.html')
+@login_required
+def dashboard(user_id=None):
+    conn = connect_db()
+    cursor = conn.cursor()
+    # Example of different content based on login status
+    if user_id:
+        query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
+                    FROM job WHERE 1=1 ORDER BY RAND() LIMIT 10;"
+        cursor.execute(query)
+        recommends = cursor.fetchall()
+
+        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
+        account = cursor.fetchall()
+        name = account[0]['name']
+
+        conn.close()
+    return render_template('dashboard.html', name=name)
 
 @server.route('/dashapp/')
 def render_dashboard():
@@ -341,14 +386,18 @@ def get_vacancy_ratio():
             job_posts = cursor.execute(
             """
             SELECT total_post - {keyword} AS others, {keyword} AS chose_cat, date
-            FROM job_post_change;
+            FROM job_post_change
+            ORDER BY date DESC
+            LIMIT 7;
             """.format(keyword=query_keyword)
             )
         else:
             job_posts = cursor.execute(
             """
             SELECT total_post - total_post AS others, total_post AS chose_cat, date
-            FROM job_post_change;
+            FROM job_post_change
+            ORDER BY date DESC
+            LIMIT 7;
             """
             )
 
@@ -414,7 +463,7 @@ def get_categories():
         return jsonify({'category': category, 'category_average': category_avg})
     
     except Exception as e:
-        logging.warning(f"An error occurred:", {e}) 
+        logging.error("Dashboard job_salary error") 
 
 @server.route('/api/dashboard/region_salary', methods=['POST'])
 def display_region_salary():
@@ -480,13 +529,14 @@ def display_region_salary():
         region = []
         region_avg = []
         for item in salary_avgs:
-            region.append(item['region'])
+            # adjust teh space between axis and graph
+            region.append(item['region']+ ' ')
             region_avg.append(int(item['region_average']))
 
         return jsonify({'region': region, 'region_average': region_avg})
     
     except Exception as e:
-        logging.warning(f"An error occurred:", {e}) 
+        logging.error("Dashboard region_salary error") 
 
 @server.route('/api/dashboard/edu_level', methods=['POST'])
 def display_edu_level():
@@ -504,6 +554,8 @@ def display_edu_level():
             FROM job
             LEFT JOIN job_category on job.job_code = job_category.job_code
             WHERE job_category = %s
+            AND edu_level IS NOT NULL
+            AND LEFT(edu_level, 2) IN ('不拘','高中','專科','大學','碩士','博士')
             GROUP BY min_edu_level;
             """,
             (keyword,)
@@ -514,7 +566,9 @@ def display_edu_level():
             SELECT LEFT(edu_level, 2) AS min_edu_level, COUNT(*) AS count
             FROM job
             WHERE edu_level IS NOT NULL
+            AND LEFT(edu_level, 2) IN ('不拘','高中','專科','大學','碩士','博士')
             GROUP BY min_edu_level;
+
             """
             )
 
@@ -551,7 +605,9 @@ def display_wordcloud():
                 FROM job
                 LEFT JOIN job_category on job.job_code = job_category.job_code
                 WHERE skills IS NOT NULL
-                AND job_category = %s;
+                AND job_category = %s
+                # ORDER BY RAND()
+                # LIMIT 1000;
                 """,
                 (keyword,)
             )
@@ -560,12 +616,14 @@ def display_wordcloud():
                 """
                 SELECT *
                 FROM job
-                WHERE skills IS NOT NULL;;
+                WHERE skills IS NOT NULL
+                # ORDER BY RAND()
+                # LIMIT 1000;
                 """
             )
         
         skills = cursor.fetchall()
-        conn.close()
+        conn.close() 
 
         skill_list = []
         for skill in skills:
@@ -575,7 +633,7 @@ def display_wordcloud():
         input_text = ' '.join(comma_separated.split(','))
 
         # Generate word cloud
-        wc = WordCloud(width=800, height=400, background_color='white', max_words=200).generate(input_text)
+        wc = WordCloud(collocations=False, width=800, height=400, background_color='white', max_words=400).generate(input_text)
         
         # Save the word cloud to a BytesIO object
         img = BytesIO()
@@ -587,4 +645,4 @@ def display_wordcloud():
         logging.warning("An error occurred:", e) 
 
 if __name__ == '__main__':
-    server.run(debug=True)
+    server.run(debug=True, host='127.0.0.1', port=5000)

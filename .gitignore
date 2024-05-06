@@ -4,5 +4,8 @@ Logs/
 *.env
 *.vscode
 *.log
+*.json
 nohup.out
 aws_pp.pem
+pp_key.pem
+ssl/

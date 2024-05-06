@@ -4,12 +4,13 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Career Compass</title>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <link rel="stylesheet" href="{{ url_for('static', filename='homepage_styles.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
-        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap">
         <script>
             function toggleBookmark(userId, jobCode) {
                 var bookmarkIcon = document.getElementById('bookmarkIcon-' + jobCode);
@@ -45,7 +46,9 @@
                         <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100" height="43">
                     </a>
                     <ul class="nav item_ul">
-                        <li class="item">搜尋職缺</li>
+                        <li class="item">
+                            <a href="{{ url_for('search_jobs_get') }}">搜尋職缺</a>
+                        </li>
                         <li class="item">
                             <a href="{{ url_for('dashboard') }}">職業觀測站</a>
                         </li>
@@ -64,88 +67,189 @@
         <div class="second-bar">
             <div class="container-second">
                 <div class="searchbar">
-                    <form class="item_ul" action="/job/search" method="POST">
-                        <input class="item" type="text" name="job_title" placeholder="Job Title" value="{{ job_title }}">
-                        <input class="item" type="text" name="salary" placeholder="Salary" value="{{ salary }}">
-                        <input class="item" type="text" name="location" placeholder="Location" value="{{ location }}">
+                    <form class="item_ul" action="/job/search" method="GET">
+                        {% if job_title %}
+                            <input class="item" type="text" name="job_title" placeholder="Job Title" value="{{ job_title }}">
+                        {% else %}
+                            <input class="item" type="text" name="job_title" placeholder="Job Title" value="">
+                        {% endif %}
+                        {% if salary %}
+                            <input class="item" type="text" name="salary" placeholder="Salary" value="{{ salary }}">
+                        {% else %}
+                            <input class="item" type="text" name="salary" placeholder="Salary" value="">
+                        {% endif %}
+                        {% if location %}
+                            <input class="item" type="text" name="location" placeholder="Location" value="{{ location }}">
+                        {% else %}
+                            <input class="item" type="text" name="location" placeholder="Location" value="">
+                        {% endif %}
                         <button class="item" type="submit">Search</button>
                     </form>
                 </div>
             </div>
         </div>        
-        <div>
-            {% if recommends %}
-                {% for recommend in recommends %}
-                    {{ recommend.job_title }}
-                    {{ recommend.company_name }}
-                    {{ recommend.job_location }}
-                    {{ recommend.salary_period }}
-                {% endfor %}
-            {% endif %}
-        </div>
         <div class="container d-flex justify-content-center mt-50 mb-50">   
             <div class="row">
-                <div class="col-md-10">
-                    {% if results %}
-                    <h2>Search Results</h2>
-                    {% for job in results %}
-                    <div class="card card-body mt-3">
-                        <div class="media align-items-center align-items-lg-start text-center text-lg-left flex-column flex-lg-row">
-                            <div class="job mr-2 mb-3 mb-lg-0">
-                                    <img src="https://cdn-icons-png.flaticon.com/512/4812/4812244.png" width="150" height="150" alt="">
-                            </div>
+                <div class="col-md-10" style="max-width: 800px;">
+                    {% if recommends %}
+                    <h2>推薦職缺</h2>
+                        {% for job in recommends %}
+                        <div class="card card-body mt-3">
+                            <div class="media align-items-center align-items-lg-start text-center text-lg-left flex-column flex-lg-row">
+                                <div class="job mr-2 mb-3 mb-lg-0">
+                                        <img src="https://cdn-icons-png.flaticon.com/512/4812/4812244.png" width="150" height="150" alt="">
+                                </div>
 
-                            <div class="media-body">
-                                <h4 class="media-title font-weight-semibold">
-                                    <a href="{{ url_for('get_jd', job_code=job.job_code) }}">
-                                        {{ job.job_title }}
-                                    </a>
-                                </h4>
+                                <div class="media-body">
+                                    <h4 class="media-title font-weight-semibold">
+                                        <a href="{{ url_for('get_jd', job_code=job.job_code) }}">
+                                            {{ job.job_title }}
+                                        </a>
+                                    </h4>
 
-                                <!-- remove a tag -->
-                                <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
-                                    <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.company_name }}</a></li>
-                                </ul>
+                                    <!-- remove a tag -->
+                                    <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
+                                        <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.company_name }}</a></li>
+                                    </ul>
 
-                                <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
-                                    <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.job_location }}</a></li>
-                                </ul>
+                                    <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
+                                        <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.job_location }}</a></li>
+                                    </ul>
 
-                                <p class="mb-3">{{ job.salary_period }}</p>
+                                    <p class="mb-3">{{ job.salary_period }}</p>
 
-                                <ul class="list-inline list-inline-dotted mb-0">
-                                    <li class="list-inline-item"><a href="{{ job.job_source }}" class="text-muted" data-abc="true">職缺詳細</a></li>
-                                    <li class="list-inline-item">Add to <a href="#" data-abc="true">wishlist</a></li>
-                                </ul>
-                            </div>
+                                    <ul class="list-inline list-inline-dotted mb-0">
+                                        <li class="list-inline-item"><a href="{{ url_for('get_jd', job_code=job.job_code) }}" class="text-muted" data-abc="true">職缺詳細</a></li>
+                                    </ul>
+                                </div>
 
-                            <div class="mt-3 mt-lg-0 ml-lg-3 text-center">
-                                {% if job.job_code in bookmarked_list %}
-                                <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
-                                    <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_filled.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                    <p>已收藏</p>
-                                </a>
-                                {% else %}
-                                <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
-                                    <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                    <p>未收藏</p>
-                                </a>
-                                {% endif %}
+                                <div class="mt-3 mt-lg-0 ml-lg-3 text-center">
+                                    {% if name %}
+                                        {% if job.job_code in bookmarked_list %}
+                                        <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
+                                            <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_filled.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                            <p>已收藏</p>
+                                        </a>
+                                        {% else %}
+                                        <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
+                                            <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                            <p>未收藏</p>
+                                        </a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="{{ url_for('get_login_page') }}">
+                                            <img src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                            <p>未收藏</p>
+                                        </a>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    {% endfor %}
+                        {% endfor %}
+                        <br>
+                        <br>
                     {% endif %}
                 </div>
-                <!-- paging buttons -->
-                <div class="col-md-10">
-                    {% if pages %}
-                    {% for page in pages  %}
-                    {% endfor %}
+                <div class="col-md-10" style="max-width: 800px;">
+                    {% if results %}
+                    <h2>查詢結果</h2>
+                        {% for job in results %}
+                        <div class="card card-body mt-3">
+                            <div class="media align-items-center align-items-lg-start text-center text-lg-left flex-column flex-lg-row">
+                                <div class="job mr-2 mb-3 mb-lg-0">
+                                        <img src="https://cdn-icons-png.flaticon.com/512/4812/4812244.png" width="150" height="150" alt="">
+                                </div>
+
+                                <div class="media-body">
+                                    <h4 class="media-title font-weight-semibold">
+                                        <a href="{{ url_for('get_jd', job_code=job.job_code) }}">
+                                            {{ job.job_title }}
+                                        </a>
+                                    </h4>
+
+                                    <!-- remove a tag -->
+                                    <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
+                                        <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.company_name }}</a></li>
+                                    </ul>
+
+                                    <ul class="list-inline list-inline-dotted mb-3 mb-lg-2">
+                                        <li class="list-inline-item"><a href="#" class="text-muted" data-abc="true">{{ job.job_location }}</a></li>
+                                    </ul>
+
+                                    <p class="mb-3">{{ job.salary_period }}</p>
+
+                                    <ul class="list-inline list-inline-dotted mb-0">
+                                        <li class="list-inline-item"><a href="{{ url_for('get_jd', job_code=job.job_code) }}" class="text-muted" data-abc="true">職缺詳細</a></li>
+                                    </ul>
+                                </div>
+
+                                <div class="mt-3 mt-lg-0 ml-lg-3 text-center">
+                                    {% if name %}
+                                        {% if job.job_code in bookmarked_list %}
+                                        <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
+                                            <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_filled.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                            <p>已收藏</p>
+                                        </a>
+                                        {% else %}
+                                        <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
+                                            <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                            <p>未收藏</p>
+                                        </a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="{{ url_for('get_login_page') }}">
+                                            <img src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                            <p>未收藏</p>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <br>
+                        <br>
+                    <div class="col-md-10">
+                        <div class="page-bottom-nav">
+                            <button id="previousPage">上一頁</button>
+                            <span class="current-page">第{{ page }}頁</span>
+                            <button id="nextPage">下一頁</button>
+                        </div>
+                    </div>   
                     {% endif %}
-                </div>               
+                </div>        
             </div>
         </div>
-
+        <script>
+            // JavaScript code for pagination
+            document.getElementById('nextPage').addEventListener('click', function() {
+                var currentPage = {{ page }};
+                var nextPage = currentPage + 1;
+                var currentUrl = window.location.href;
+        
+                if (currentUrl.includes('page=')) {
+                    var newUrl = currentUrl.replace(/([?&])page=\d+/, '$1page=' + nextPage);
+                } else {
+                    var newUrl = currentUrl + (currentUrl.includes('?') ? '&' : '?') + 'page=' + nextPage;
+                }
+        
+                window.location.href = newUrl;
+            });
+        
+            document.getElementById('previousPage').addEventListener('click', function() {
+                var currentPage = {{ page }};
+                if (currentPage > 1) {
+                    var previousPage = currentPage - 1;
+                    var currentUrl = window.location.href;
+        
+                    if (currentUrl.includes('page=')) {
+                        var newUrl = currentUrl.replace(/([?&])page=\d+/, '$1page=' + previousPage);
+                    } else {
+                        var newUrl = currentUrl + (currentUrl.includes('?') ? '&' : '?') + 'page=' + previousPage;
+                    }
+        
+                    window.location.href = newUrl;
+                }
+            });
+        </script>
     </body>
 </html>

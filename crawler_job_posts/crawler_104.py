@@ -64,9 +64,9 @@ def crawl_all_id(driver, category):
                         if job_code not in all_job_codes:
                             all_job_codes.append(job_code)
                     else:
-                        logging.warning("No job code found for post: %s", post.text)
+                        logging.error("No job code found for post: %s", post.text)
         except StaleElementReferenceException or WebDriverException as e:
-            logging.warning(f"Error occurred: {e}")
+            logging.error(f"Error occurred: {e}")
 
         # turn page and crawl till last page
         try:
@@ -90,12 +90,12 @@ def crawl_all_id(driver, category):
                             if job_code not in all_job_codes:
                                 all_job_codes.append(job_code)
                         else:
-                            logging.warning("No job code found for post: %s", post.text)
+                            logging.error("No job code found for post: %s", post.text)
             except StaleElementReferenceException or WebDriverException as e:
-                logging.warning(f"Error occurred: {e}")
+                logging.error(f"Error occurred: {e}")
 
             # Wait for the next page to load
-            time.sleep(1)  # Adjust this delay according to your page load time
+            time.sleep(1)
         except ElementNotInteractableException:
             break  # Exit the loop if the "Next Page" button is not found
 
@@ -103,81 +103,81 @@ def crawl_all_id(driver, category):
 
 # get job details
 def get_all_jd(job_id_list): 
-    
     all_jds = []
     for job_id in job_id_list:
-        url = f'https://www.104.com.tw/job/ajax/content/{job_id}'
-
-        # set default results to None
-        job_title = None
-        job_code = job_id
-        company_name = None
-        job_location = None
-        salary_info = None
-        min_salary = None
-        max_salary = None
-        edu_level = None
-        work_experience = None
-        skills = None
-        travel = None
-        management = None
-        remote = None
-        job_category = None
-        url_to_104 = f'https://www.104.com.tw/job/{job_id}'
-        print(url_to_104)
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.92 Safari/537.36',
-            'Referer': f'https://www.104.com.tw/job/{job_id}'
-        }
-
         try:
+            url = f'https://www.104.com.tw/job/ajax/content/{job_id}'
+
+            # set default results to None
+            job_title = None
+            job_code = job_id
+            company_name = None
+            job_location = None
+            salary_info = None
+            min_salary = None
+            max_salary = None
+            edu_level = None
+            work_experience = None
+            skills = None
+            travel = None
+            management = None
+            remote = None
+            job_category = None
+            url_to_104 = f'https://www.104.com.tw/job/{job_id}'
+            print(url_to_104)
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.92 Safari/537.36',
+                'Referer': f'https://www.104.com.tw/job/{job_id}'
+            }
             r = requests.get(url, headers=headers)
             if r.status_code == 200:
 
                 data = r.json()
                 
                 if data['data']['switch'] == 'on':
-                    job_title = data['data']['header']['jobName']
-                    company_name = data['data']['header']['custName']
-                    # only 3 characters? 
-                    job_location = data['data']['jobDetail']['addressRegion']
-                    print(job_location)
-                    salary_info = data['data']['jobDetail']['salary']
-                    min_salary = data['data']['jobDetail']['salaryMin']
-                    max_salary = data['data']['jobDetail']['salaryMax']
-                    edu_level = data['data']['condition']['edu']
-                    work_experience = data['data']['condition']['workExp']
-                    # iterate for multiple skills
-                    for item in data['data']['condition']['specialty']:
-                        if skills is None:
-                            skills = str(item['description'])
+                    try:
+                        job_title = data['data']['header']['jobName']
+                        company_name = data['data']['header']['custName']
+                        # only 3 characters? 
+                        job_location = data['data']['jobDetail']['addressRegion']
+                        print(job_location)
+                        salary_info = data['data']['jobDetail']['salary']
+                        min_salary = data['data']['jobDetail']['salaryMin']
+                        max_salary = data['data']['jobDetail']['salaryMax']
+                        edu_level = data['data']['condition']['edu']
+                        work_experience = data['data']['condition']['workExp']
+                        # iterate for multiple skills
+                        for item in data['data']['condition']['specialty']:
+                            if skills is None:
+                                skills = str(item['description'])
+                            else:
+                                skills += "," + str(item['description'])
+                        if data['data']['jobDetail']['businessTrip'] != None:
+                            travel = data['data']['jobDetail']['businessTrip']
+                        management = data['data']['jobDetail']['manageResp']
+                        if data['data']['jobDetail']['remoteWork'] != None:
+                            remote = '可遠端工作'
                         else:
-                            skills += "," + str(item['description'])
-                    if data['data']['jobDetail']['businessTrip'] != None:
-                        travel = data['data']['jobDetail']['businessTrip']
-                    management = data['data']['jobDetail']['manageResp']
-                    if data['data']['jobDetail']['remoteWork'] != None:
-                        remote = '可遠端工作'
-                    else:
-                        remote = '不可遠端工作'
-                    # iterate for multiple categories
-                    job_category = []
-                    for item in data['data']['jobDetail']['jobCategory']:
-                        job_category.append(item['description'])
-                    
-                    job_info = [job_title, job_code, company_name, job_location, salary_info, \
-                                min_salary, max_salary, edu_level, work_experience, skills, \
-                                travel, management, remote, url_to_104, job_category]
+                            remote = '不可遠端工作'
+                        # iterate for multiple categories
+                        job_category = []
+                        for item in data['data']['jobDetail']['jobCategory']:
+                            job_category.append(item['description'])
+                        
+                        job_info = [job_title, job_code, company_name, job_location, salary_info, \
+                                    min_salary, max_salary, edu_level, work_experience, skills, \
+                                    travel, management, remote, url_to_104, job_category]
 
-                    all_jds.append(job_info)
-                    r.close()
-                    time.sleep(0.01)
+                        all_jds.append(job_info)
+                        r.close()
+                        time.sleep(0.01)
+                    except Exception as e:
+                        logging.error(f'get 104 jd, {url} request failed', {e})
                 else:
-                    logging.warning(f'get 104 jd, {url} request failed', r.status_code)
-        except ConnectionError as e:
-            logging.warning(f"Connection error occurred: {e}")
-    
+                    logging.error(f'did not get jd from {url}, posting is closed')
+        except Exception as e:
+            logging.error(f'get 104 jd, {url} request failed', {e})
     return all_jds
 
 # insert each job to database
@@ -265,11 +265,17 @@ def insert_sql(all_jd_list):
     db_mysql_conn.commit()
 
     # Now, for job categories
-    category_data = [(jd[1], category) for jd in all_jd_list for category in jd[12]]
+    category_data = [(jd[1], category) for jd in all_jd_list for category in jd[14]]
 
     # Prepare the query for bulk insertion for job categories
-    insert_category_query = "INSERT INTO job_category (job_code, job_category) VALUES (%s, %s)"
-
+    insert_category_query = """
+        INSERT INTO job_category (job_code, job_category) 
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE
+        job_code = VALUES(job_code),
+        job_category = VALUES(job_category)
+        """
+    
     # Execute the bulk insert for job categories
     cursor.executemany(insert_category_query, category_data)
     db_mysql_conn.commit()
@@ -346,7 +352,8 @@ category_list = ['2007001013','2007001014','2007001015','2007001016','2007001017
                 '2007001018','2007001021','2007001022','2007001020','2007002002']
 
 # category_list = ['2007001023']
-# category_list = ['2007001022','2007001020','2007002002']
+# category_list = ['2007001016', \
+#                 '2007001018','2007001021','2007001022','2007001020','2007002002']
 
 for category in category_list:
     all_job_codes = crawl_all_id(driver, category)
