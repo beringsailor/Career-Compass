@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <script src='https://cdn.plot.ly/plotly-2.31.1.min.js'></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='homepage_styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard_styles.css') }}">
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+</head>
+<body>
+    <header>
+        <nav class="top-bar">
+            <div class="container-top">
+                <a href="{{ url_for('homepage') }}">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100" height="43">
+                </a>
+                <ul class="nav item_ul">
+                    <li class="item">
+                        <a href="{{ url_for('search_jobs_get') }}">搜尋職缺</a>
+                    </li>
+                    <li class="item">
+                        <a href="{{ url_for('dashboard') }}">職業觀測站</a>
+                    </li>
+                    <li class="item">
+                        {% if name %}
+                            <a href="{{ url_for('profile') }}" data-userid="{{ user_id }}">{{ name }}</a>
+                        {% else %}
+                            <a href="{{ url_for('get_login_page') }}">登入 / 註冊</a>
+                        {% endif %}
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+    
+    <div class="second-bar">
+        <div class="container-second" id="select-dashboard">
+            <h2 id="dashboard-heading">軟體工程師 就業市場情報</h2>
+            <select id="categoryDropdown">
+            <option value="">軟體工程師</option>
+            <option value="iOS工程師">iOS工程師</option>
+            <option value="Android工程師">Android工程師</option>
+            <option value="前端工程師">前端工程師</option>
+            <option value="後端工程師">後端工程師</option>
+            <option value="全端工程師">全端工程師</option>
+            <option value="數據分析師">數據分析師</option>
+            <option value="資料科學家">資料科學家</option>
+            <option value="資料工程師">資料工程師</option>
+            <option value="AI工程師">AI工程師</option>
+            <option value="資料庫管理人員">資料庫管理人員</option>
+        </select>
+        </div>
+    </div>
+
+    <div class="flex-container">
+        <div clsss="chosen-category"></div>
+        <div class="flex-container-2">
+            <div class="flex-container-1">
+                <h3 id="region-heading">台灣各縣市薪水平均值</h3>
+                <div id="region-chart" class="chart"></div>
+            </div>
+            <div class="flex-container-1">
+                <div class="flex-container-2">
+                    <div class="flex-container-1">
+                        <h3 id="edu-heading">要求學歷分布圖</h3>
+                        <div id="edu-chart" class="chart"></div>
+                    </div>
+                    <div class="flex-container-1">
+                        <h3 id="ratio-heading">職缺占比</h3>
+                        <div id="ratio-chart" class="chart"></div>
+                    </div>
+                </div>
+                <h3 id="wordcloud-heading">技能關鍵字</h3>
+                <img id="wordcloud" class="chart" src="" alt="Word Cloud">
+            </div>
+        </div>
+    </div>
+    <!-- <div id="category-chart"></div> -->
+    
+
+    <br><br>
+    <script>        
+        // load inital js content
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize charts when the DOM is loaded
+            fetchWordCloud(null);
+            createPieChart(null);
+            createRegionBarChart(null);
+            createCategoryBarChart();
+            createJobRatioBarChart(null);
+
+            // Add event listeners to all buttons
+            document.getElementById('categoryDropdown').addEventListener('change', function() {
+                const keyword = this.value;
+                fetchWordCloud(keyword);
+                createPieChart(keyword);
+                createRegionBarChart(keyword);
+                createJobRatioBarChart(keyword);
+
+                // Update the heading text with the selected value
+                document.getElementById('dashboard-heading').textContent = keyword + ' 就業市場情報';
+            });
+        });
+
+        // wordcloud
+        async function fetchWordCloud(keyword) {
+            try {
+                const response = await fetch('/api/dashboard/generate_wordcloud', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 'input_text': keyword })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const img = document.getElementById('wordcloud');
+                await new Promise(resolve => {
+                    img.onload = resolve;
+                    img.src = url;
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // pie-chart
+        function createPieChart(keyword) {
+            fetch('/api/dashboard/edu_level', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }, 
+                body: JSON.stringify({ 'input_text': keyword })
+            })
+            .then(response => response.json())
+            .then(data => {
+                updatePieChart(data.values, data.labels);
+            })
+            .catch(error => console.error('Error fetching data:', error));
+        }
+
+        function updatePieChart(values, labels) {
+            var data = [{
+                type: "pie",
+                values: values,
+                labels: labels,
+                textinfo: "label+percent",
+                textposition: "outside",
+                hole: .6,
+                automargin: true
+            }];
+
+            var layout = {
+                height: 380,
+                width: 380,
+                showlegend: false
+            };
+
+            // Update the pie chart
+            Plotly.newPlot('edu-chart', data, layout);
+        }
+
+        // barchart for region
+        function createRegionBarChart(keyword) {
+            fetch('/api/dashboard/region_salary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }, 
+                body: JSON.stringify({ 'input_text': keyword })
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateRegionBarChart(data.region, data.region_average);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function updateRegionBarChart(region, region_avg) {
+            const data = [{
+                type: 'bar',
+                x: region_avg,
+                y: region,
+                width: 0.5,
+                // text: region,
+                orientation: 'h'
+            }];
+
+            const layout = {
+                height: 800,
+                width: 500,
+                yaxis: {autorange: "reversed"},
+                margin: {"t": 80, "b": 80, "l": 80, "r": 80},
+                showlegend: false
+            };
+
+            Plotly.newPlot('region-chart', data, layout)
+        }
+
+        // barchart for job vacancy ratio
+        function createJobRatioBarChart(keyword) {
+            fetch('/api/dashboard/job_vacancy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }, 
+                body: JSON.stringify({ 'input_text': keyword })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response from /api/dashboard/job_vacancy:', data);
+                updateJobRatioBarChart(keyword, data.chose_cat, data.others, data.dates);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function updateJobRatioBarChart(keyword, chose_cat, others, dates) {
+            const data1 = {
+                type: 'bar',
+                name: keyword ? String(keyword) : '所有職缺',
+                x: dates,
+                y: chose_cat,
+            };
+
+            const data2 = {
+                type: 'bar',
+                name: '其他分類職缺',
+                x: dates,
+                y: others,
+            };
+
+            var data = [data1, data2];
+
+            const layout = {
+                height: 380,
+                width: 380,
+                barmode: 'stack',
+                showlegend: true
+            };
+
+            Plotly.newPlot('ratio-chart', data, layout)
+        }
+
+        // barchart for job_category
+        function createCategoryBarChart() {
+            fetch('/api/dashboard/job_salary')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Received JSON data:', data);
+                    updateCategoryBarChart(data.category, data.category_average);
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function updateCategoryBarChart(category, category_avg) {
+            const data = [{
+                type: "bar",
+                x: category_avg,
+                y: category,
+                orientation: 'h'
+            }];
+
+            const layout = {
+                height: 450,
+                width: 540,
+                yaxis: {autorange: "reversed"},
+                margin: {"t": 100, "b": 100, "l": 100, "r": 100},
+                showlegend: false
+            };
+
+            Plotly.newPlot('category-chart', data, layout)
+        }
+    </script>
+</body>
+</html>

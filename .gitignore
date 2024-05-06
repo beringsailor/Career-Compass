@@ -1,14 +1,11 @@
-# ignore all __pycache__
+# ignore
 __pycache__/
-
-# ignore all .env
+Logs/
 *.env
-
-# ignore all .vscode
 *.vscode
-
-# ignore nohup.out
-nohup.out
-
-# ignore .log
 *.log
+*.json
+nohup.out
+aws_pp.pem
+pp_key.pem
+ssl/

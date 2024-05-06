@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Job Description</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='homepage_styles.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <link rel="stylesheet" href="{{ url_for('static', filename='job_content_styles.css') }}">
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
+    </head>
+    <body>
+        <header>
+            <nav class="top-bar">
+                <div class="container-top">
+                    <a href="{{ url_for('homepage') }}">
+                        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100" height="43">
+                    </a>
+                    <ul class="nav item_ul">
+                        <li class="item">
+                            <a href="{{ url_for('search_jobs_get') }}">搜尋職缺</a>
+                        </li>
+                        <li class="item">
+                            <a href="{{ url_for('dashboard') }}">職業觀測站</a>
+                        </li>
+                        <li class="item">
+                            {% if name %}
+                                <a href="{{ url_for('profile') }}" data-userid="{{ user_id }}">{{ name }}</a>
+                            {% else %}
+                                <a href="{{ url_for('get_login_page') }}">登入 / 註冊</a>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </header>
+        
+        <div class="container d-flex justify-content-center mt-50 mb-50 flex-container-1">
+            <div class="main-job">
+                {% if results %}
+                {% for result in results %}
+                <div class="flex-container-2">
+                   <h2>職缺敘述</h2>
+                   <br>
+                   <figure class="card card-product-grid card-lg item">
+                      <figcaption class="info-wrap">
+                         <div class="row">
+                            <div class="col-md-9 col-xs-9">
+                               <a href="#" class="title" data-abc="true">
+                                  <h3>{{ result.job_title }}</h3>
+                               </a>
+                               <span class="rated"></span> 
+                            </div>
+                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">公司：{{ result.company_name }}</a> <span class="rated"></span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">地址：{{ result.job_location }}</a> <span class="rated"></span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">薪資：{{ result.salary_period }}</a> <span class="rated">==</span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">學歷：{{ result.edu_level }}</a> <span class="rated"></span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">年資：{{ result.work_experience }}</a> <span class="rated"></span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">技能：{{ result.skills }}</a> <span class="rated"></span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">是否可遠端：{{ result.remote }}</a> <span class="rated"></span> </div>
+                            <!-- <div class="col-md-3 col-xs-3">
+                               <div class="rating text-right"> <i class="fa fa-star"></i> <i class="fa fa-star"></i> <i class="fa fa-star"></i> <i class="fa fa-star"></i> <span class="rated">Rated 4.0/5</span> </div>
+                               </div> -->
+                         </div>
+                      </figcaption>
+                      <div class="bottom-wrap-payment">
+                         <figcaption class="info-wrap">
+                            <div class="row">
+                               <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">管理責任：{{ result.management }}</a> <span class="rated"></span> </div>
+                               <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">出差外派：{{ result.travel }}</a> <span class="rated"></span> </div>
+                               <div class="col-md-3 col-xs-3">
+                                  <div class="rating text-right"> #### 8787 </div>
+                               </div>
+                            </div>
+                         </figcaption>
+                      </div>
+                      <div class="bottom-wrap">
+                         <div class="price-wrap"> <a href="{{ result.job_source }}" class="btn btn-warning float-right" data-abc="true"> 前往原網站 </a> </div>
+                      </div>
+                   </figure>
+                </div>
+                {% endfor %}
+                {% endif %}
+             </div>
+
+            <div class="side-recommend flex-container-2">
+                <h2>推薦職缺</h2>
+                <br>
+                {% if sides %}
+                {% for side in sides %}
+                <figure class="card-side card-product-grid card-lg item">
+                    <figcaption class="info-wrap">
+                        <div class="row">
+                            <div class="col-md-9 col-xs-9"> <a href="{{ url_for('get_jd', job_code=side.job_code) }}" class="title" data-abc="true"> <h5>{{ side.job_title }}</h5></a> <span class="rated"></span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="{{ url_for('get_jd', job_code=side.job_code) }}" class="title" data-abc="true">{{ side.company_name }}</a> <span class="rated"></span> </div>
+                            <div class="col-md-9 col-xs-9"> <a href="{{ url_for('get_jd', job_code=side.job_code) }}" class="title" data-abc="true">{{ side.job_location }}</a> <span class="rated"></span> </div>
+                        </div>
+                    </figcaption>
+                </figure>
+                <br>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+    </body>
+</html>
+
+<!-- ref: https://bbbootstrap.com/snippets/bootstrap-product-invoice-card-14183634 -->

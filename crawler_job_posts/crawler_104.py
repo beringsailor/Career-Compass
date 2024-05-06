@@ -1,8 +1,8 @@
 import time
 import random
 import requests
-import unicodedata
 from datetime import datetime, timedelta, UTC
+import threading
 import pymysql
 import sys
 import os
@@ -18,210 +18,325 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait  
-from selenium.common.exceptions import ElementNotInteractableException, StaleElementReferenceException
+from selenium.common.exceptions import ElementNotInteractableException, StaleElementReferenceException, WebDriverException
 from selenium.webdriver.support import expected_conditions as EC
 from logging.handlers import TimedRotatingFileHandler
 
 # # to produce log
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.DEBUG)
+# if not os.path.exists("Logs"):
+#     os.makedirs("Logs")
 
-# handler = TimedRotatingFileHandler(filename='example.log', when='midnight', interval=1, backupCount=7)
-# formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-# handler.setFormatter(formatter)
+# logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%a, %d %b %Y %H:%M:%S')
+# handler = TimedRotatingFileHandler(filename='Logs/example.log', when='midnight', interval=1, backupCount=7)
 # logger.addHandler(handler)
 
-# logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-
-# logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-
-# to start crawling
+# start crawling
 headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}
 
 # to prevent ERROR:cert_issuer_source_aia.cc(35)
 options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
-# can't be headless, will be blocked
-# options.add_argument('--headless')
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-# blockchain SWE
-# driver.get("https://www.104.com.tw/jobs/search/?jobcat=2007001023")
-driver.get("https://www.104.com.tw/jobs/search/?jobcat=2007001022")
-
-# crawl job_ids of each page
-def crawl_id_each_page(driver):
-    job_codes_per_page = []
-
-    try:
-        posts = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "b-block--top-bord.job-list-item.b-clearfix.js-job-item")))
-        for post in posts:
-            # Not extract the first 2 commercial recommended posts
-            if "js-job-item--focus" not in post.get_attribute("class"):
-                pattern = r'job/(\w+)\?'
-
-                job_element = WebDriverWait(post, 30).until(EC.element_to_be_clickable((By.XPATH, ".//a[@data-qa-id='jobSeachResultTitle' and contains(@class, 'js-job-link')]")))
-                job_link= job_element.get_attribute("href")
-                match = re.search(pattern, job_link)
-                if match:
-                    job_code = match.group(1)
-                    job_codes_per_page.append(job_code)
-                else:
-                    # Log a warning message
-                    logging.warning("No job code found for post: %s", post.text)
-    except StaleElementReferenceException:
-        # Retry if a stale element reference exception occurs
-        return crawl_id_each_page(driver)
+# crawl all ids
+def crawl_all_id(driver, category):
     
-    return job_codes_per_page
-
-# crawl through multiple pages
-def crawl_id_all_pages(driver):
     all_job_codes = []
+                     
+    url = f'https://www.104.com.tw/jobs/search/?jobcat={category}'
+    driver.get(url)
 
     while True:
         # Extract job codes from the current page
-        job_codes_per_page = crawl_id_each_page(driver)
-        all_job_codes.extend(job_codes_per_page)
+        try:
+            posts = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "b-block--top-bord.job-list-item.b-clearfix.js-job-item")))
+            for post in posts:
+                # Not extract the first 2 commercial recommended posts
+                if "js-job-item--focus" not in post.get_attribute("class"):
+                    pattern = r'job/(\w+)\?'
 
+                    job_element = WebDriverWait(post, 30).until(EC.element_to_be_clickable((By.XPATH, ".//a[@data-qa-id='jobSeachResultTitle' and contains(@class, 'js-job-link')]")))
+                    job_link= job_element.get_attribute("href")
+                    match = re.search(pattern, job_link)
+                    if match:
+                        job_code = match.group(1)
+                        if job_code not in all_job_codes:
+                            all_job_codes.append(job_code)
+                    else:
+                        logging.error("No job code found for post: %s", post.text)
+        except StaleElementReferenceException or WebDriverException as e:
+            logging.error(f"Error occurred: {e}")
+
+        # turn page and crawl till last page
         try:
             next_button = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CLASS_NAME, "b-btn.b-btn--page.js-next-page")))
             next_button = driver.find_element(By.CLASS_NAME, "b-btn.b-btn--page.js-next-page")
             driver.execute_script("arguments[0].scrollIntoView(true);", next_button)
             next_button.click() 
             
-            job_codes_per_page = crawl_id_each_page(driver)
-            all_job_codes.extend(job_codes_per_page)
+            try:
+                posts = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "b-block--top-bord.job-list-item.b-clearfix.js-job-item")))
+                for post in posts:
+                    # Not extract the first 2 commercial recommended posts
+                    if "js-job-item--focus" not in post.get_attribute("class"):
+                        pattern = r'job/(\w+)\?'
+
+                        job_element = WebDriverWait(post, 30).until(EC.element_to_be_clickable((By.XPATH, ".//a[@data-qa-id='jobSeachResultTitle' and contains(@class, 'js-job-link')]")))
+                        job_link= job_element.get_attribute("href")
+                        match = re.search(pattern, job_link)
+                        if match:
+                            job_code = match.group(1)
+                            if job_code not in all_job_codes:
+                                all_job_codes.append(job_code)
+                        else:
+                            logging.error("No job code found for post: %s", post.text)
+            except StaleElementReferenceException or WebDriverException as e:
+                logging.error(f"Error occurred: {e}")
 
             # Wait for the next page to load
-            time.sleep(2)  # Adjust this delay according to your page load time
+            time.sleep(1)
         except ElementNotInteractableException:
             break  # Exit the loop if the "Next Page" button is not found
 
     return all_job_codes
 
 # get job details
-def get_job(job_id):
-    url = f'https://www.104.com.tw/job/ajax/content/{job_id}'
+def get_all_jd(job_id_list): 
+    all_jds = []
+    for job_id in job_id_list:
+        try:
+            url = f'https://www.104.com.tw/job/ajax/content/{job_id}'
 
-    # set default results to None
-    job_title = None
-    company_name = None
-    job_location = None
-    salary_info = None
-    min_salary = None
-    max_salary = None
-    edu_level = None
-    work_experience = None
-    skills = None
-    travel = None
-    management = None
-    remote = None
-    job_category = None
+            # set default results to None
+            job_title = None
+            job_code = job_id
+            company_name = None
+            job_location = None
+            salary_info = None
+            min_salary = None
+            max_salary = None
+            edu_level = None
+            work_experience = None
+            skills = None
+            travel = None
+            management = None
+            remote = None
+            job_category = None
+            url_to_104 = f'https://www.104.com.tw/job/{job_id}'
+            print(url_to_104)
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.92 Safari/537.36',
-        'Referer': f'https://www.104.com.tw/job/{job_id}'
-    }
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.92 Safari/537.36',
+                'Referer': f'https://www.104.com.tw/job/{job_id}'
+            }
+            r = requests.get(url, headers=headers)
+            if r.status_code == 200:
 
-    r = requests.get(url, headers=headers)
-    if r.status_code != 200:
-        logging.warning('get 104 jd request failed', r.status_code)
+                data = r.json()
+                
+                if data['data']['switch'] == 'on':
+                    try:
+                        job_title = data['data']['header']['jobName']
+                        company_name = data['data']['header']['custName']
+                        # only 3 characters? 
+                        job_location = data['data']['jobDetail']['addressRegion']
+                        print(job_location)
+                        salary_info = data['data']['jobDetail']['salary']
+                        min_salary = data['data']['jobDetail']['salaryMin']
+                        max_salary = data['data']['jobDetail']['salaryMax']
+                        edu_level = data['data']['condition']['edu']
+                        work_experience = data['data']['condition']['workExp']
+                        # iterate for multiple skills
+                        for item in data['data']['condition']['specialty']:
+                            if skills is None:
+                                skills = str(item['description'])
+                            else:
+                                skills += "," + str(item['description'])
+                        if data['data']['jobDetail']['businessTrip'] != None:
+                            travel = data['data']['jobDetail']['businessTrip']
+                        management = data['data']['jobDetail']['manageResp']
+                        if data['data']['jobDetail']['remoteWork'] != None:
+                            remote = '可遠端工作'
+                        else:
+                            remote = '不可遠端工作'
+                        # iterate for multiple categories
+                        job_category = []
+                        for item in data['data']['jobDetail']['jobCategory']:
+                            job_category.append(item['description'])
+                        
+                        job_info = [job_title, job_code, company_name, job_location, salary_info, \
+                                    min_salary, max_salary, edu_level, work_experience, skills, \
+                                    travel, management, remote, url_to_104, job_category]
 
-    data = r.json()
-    # print(data['data'])
-
-    job_title = data['data']['header']['jobName']
-    company_name = data['data']['header']['custName']
-    # only 3 characters? 
-    job_location = data['data']['jobDetail']['addressArea']
-    salary_info = data['data']['jobDetail']['salary']
-    min_salary = data['data']['jobDetail']['salaryMin']
-    max_salary = data['data']['jobDetail']['salaryMax']
-    edu_level = data['data']['condition']['edu']
-    work_experience = data['data']['condition']['workExp']
-    # iterate for multiple skills
-    for item in data['data']['condition']['specialty']:
-        if skills is None:
-            skills = str(item['description'])
-        else:
-            skills += "," + str(item['description'])
-    if data['data']['jobDetail']['businessTrip'] != None:
-        travel = data['data']['jobDetail']['businessTrip']
-    management = data['data']['jobDetail']['manageResp']
-    if data['data']['jobDetail']['remoteWork'] != None:
-        remote = '可遠端工作'
-    else:
-        remote = '不可遠端工作'
-    # iterate for multiple categories
-    job_category = []
-    for item in data['data']['jobDetail']['jobCategory']:
-        job_category.append(item['description'])
-    
-    job_info = [job_title, company_name, job_location, salary_info, min_salary, \
-                max_salary, edu_level, work_experience, skills, travel, \
-                management, remote, job_category]
-    
-    # job_info_s3 = {
-    # 'job_title': job_title, 
-    # 'company_name': company_name, 
-    # 'job_location': job_location, 
-    # 'salary_info': salary_info, 
-    # 'min_salary': min_salary, 
-    # 'max_salary': max_salary, 
-    # 'edu_level': edu_level, 
-    # 'work_experience': work_experience, 
-    # 'skills': skills, 
-    # 'travel': travel,
-    # 'management': management, 
-    # 'remote': remote, 
-    # 'job_category': job_category
-    # }  
-
-    # # return data['data']
-    # time.sleep(random.uniform(1, 3))
-
-    return job_info
+                        all_jds.append(job_info)
+                        r.close()
+                        time.sleep(0.01)
+                    except Exception as e:
+                        logging.error(f'get 104 jd, {url} request failed', {e})
+                else:
+                    logging.error(f'did not get jd from {url}, posting is closed')
+        except Exception as e:
+            logging.error(f'get 104 jd, {url} request failed', {e})
+    return all_jds
 
 # insert each job to database
-def insert_sql(one_job_jd):
+def insert_sql(all_jd_list):
+    # Connect to AWS RDS
+    db_mysql_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
+                                    user=os.getenv("RDS_USER"),
+                                    password=os.getenv("RDS_PASSWORD"),
+                                    database=os.getenv("RDS_DB"),
+                                    charset='utf8mb4',
+                                    cursorclass=pymysql.cursors.DictCursor)
+
+    cursor = db_mysql_conn.cursor()
+    
+    # # create temp table
+    # cursor.execute(
+    # """
+    # CREATE TEMPORARY TABLE `temp_job` (
+    #   id bigint unsigned NOT NULL AUTO_INCREMENT,
+    #   job_code varchar(255) NOT NULL,
+    #   job_title varchar(255) NOT NULL,
+    #   company_name varchar(255) NOT NULL,
+    #   job_location varchar(255) NOT NULL,
+    #   salary_period varchar(255) DEFAULT NULL,
+    #   min_salary bigint DEFAULT NULL,
+    #   max_salary bigint DEFAULT NULL,
+    #   edu_level varchar(255) DEFAULT NULL,
+    #   work_experience varchar(255) NOT NULL,
+    #   skills varchar(255) DEFAULT NULL,
+    #   travel varchar(255) DEFAULT NULL,
+    #   management varchar(255) DEFAULT NULL,
+    #   remote varchar(255) DEFAULT NULL,
+    #   job_source varchar(255) NOT NULL,
+    #   create_date timestamp NOT NULL,
+    #   PRIMARY KEY (id),
+    #   UNIQUE KEY temp_job_job_code_unique (job_code)
+    # )
+    # """
+    # )
+
+    # cursor.execute(
+    # """
+    # CREATE TEMPORARY TABLE `temp_job_category` (
+    # `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+    # `job_code` varchar(255) NOT NULL,
+    # `job_category` varchar(255) NOT NULL,
+    # PRIMARY KEY (`id`),
+    # KEY `idx_job_code` (`job_code`),
+    # CONSTRAINT `job_category_job_code_foreign` FOREIGN KEY (`job_code`) REFERENCES `job` (`job_code`)
+    # )
+    # """
+    # )
+
     # get taiwan date when inserting
     tw_time = datetime.now(UTC) + timedelta(hours=8)
     tw_date = tw_time.date()
 
-    insert_query = \
-    """""""""
-    INSERT INTO job (job_title, company_name, job_location, salary_period, min_salary, 
-                    max_salary, edu_level, work_experience, skills, travel, 
-                    management, remote, job_source, create_date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """""""""
-    cursor.execute(insert_query, (one_job_jd[0], one_job_jd[1], one_job_jd[2], one_job_jd[3], one_job_jd[4], \
-                                    one_job_jd[5], one_job_jd[6], one_job_jd[7], one_job_jd[8], one_job_jd[9], \
-                                    one_job_jd[10], one_job_jd[11], '104', tw_date))
+    job_data = [(jd[0], jd[1], jd[2], jd[3], jd[4], jd[5], jd[6], jd[7], jd[8], jd[9], jd[10], jd[11], jd[12], jd[13], tw_date) for jd in all_jd_list]
+
+    # Prepare the query for bulk insertion
+    insert_query = """
+        INSERT INTO job (job_title, job_code, company_name, job_location, salary_period, 
+                        min_salary, max_salary, edu_level, work_experience, skills, 
+                        travel, management, remote, job_source, create_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                        job_title = VALUES(job_title),
+                        company_name = VALUES(company_name),
+                        job_location = VALUES(job_location),
+                        salary_period = VALUES(salary_period),
+                        min_salary = VALUES(min_salary),
+                        max_salary = VALUES(max_salary),
+                        edu_level = VALUES(edu_level),
+                        work_experience = VALUES(work_experience),
+                        skills = VALUES(skills),
+                        travel = VALUES(travel),
+                        management = VALUES(management),
+                        remote = VALUES(remote),
+                        job_source = VALUES(job_source),
+                        create_date = VALUES(create_date)
+    """
+
+    # Execute the bulk insert
+    cursor.executemany(insert_query, job_data)
     db_mysql_conn.commit()
 
-    last_id = cursor.lastrowid
-    for j_category in one_job_jd[12]:
-        insert_query = "INSERT INTO job_category (job_id, job_category) VALUES (%s, %s)"
-        cursor.execute(insert_query, (last_id, j_category))
+    # Now, for job categories
+    category_data = [(jd[1], category) for jd in all_jd_list for category in jd[14]]
 
-        db_mysql_conn.commit()
+    # Prepare the query for bulk insertion for job categories
+    insert_category_query = """
+        INSERT INTO job_category (job_code, job_category) 
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE
+        job_code = VALUES(job_code),
+        job_category = VALUES(job_category)
+        """
+    
+    # Execute the bulk insert for job categories
+    cursor.executemany(insert_category_query, category_data)
+    db_mysql_conn.commit()
+    
+    # for one_job_jd in all_jd_list:
+    #     insert_query = \
+    #     """
+    #     INSERT INTO job (job_title, job_code, company_name, job_location, salary_period, 
+    #                     min_salary, max_salary, edu_level, work_experience, skills, 
+    #                     travel, management, remote, job_source, create_date)
+    #                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    #                     ON DUPLICATE KEY UPDATE
+    #                     job_title = VALUES(job_title),
+    #                     company_name = VALUES(company_name),
+    #                     job_location = VALUES(job_location),
+    #                     salary_period = VALUES(salary_period),
+    #                     min_salary = VALUES(min_salary),
+    #                     max_salary = VALUES(max_salary),
+    #                     edu_level = VALUES(edu_level),
+    #                     work_experience = VALUES(work_experience),
+    #                     skills = VALUES(skills),
+    #                     travel = VALUES(travel),
+    #                     management = VALUES(management),
+    #                     remote = VALUES(remote),
+    #                     job_source = VALUES(job_source),
+    #                     create_date = VALUES(create_date);
+    #     """
+    #     cursor.execute(insert_query, (one_job_jd[0], one_job_jd[1], one_job_jd[2], one_job_jd[3], one_job_jd[4], \
+    #                                     one_job_jd[5], one_job_jd[6], one_job_jd[7], one_job_jd[8], one_job_jd[9], \
+    #                                     one_job_jd[10], one_job_jd[11], one_job_jd[12], one_job_jd[13], tw_date))
+    #     db_mysql_conn.commit()
+
+    #     for j_category in one_job_jd[12]:
+    #         insert_query = "INSERT INTO job_category (job_code, job_category) VALUES (%s, %s)"
+    #         cursor.execute(insert_query, (one_job_jd[1], j_category))
+
+    #         db_mysql_conn.commit()
+
+    db_mysql_conn.close()
 
 # jd_list to json file
-def list_to_json(input_list):
+def list_to_json(input_list, category):
     # get taiwan date when inserting
     tw_time = datetime.now(UTC) + timedelta(hours=8)
     tw_date = tw_time.date()
 
-    filename = f"jd_104_{tw_date}.json"
+    filename = f"jd_104_{category}_{tw_date}.json"
     with open(filename, "w", encoding="utf-8") as json_file:
         json.dump(input_list, json_file, ensure_ascii=False, indent=4)
 
     return filename
 
 # upload_s3 for backup
-def upload_to_s3(filename, BUCKET_NAME):
+def upload_to_s3(filename):
+    # access s3 bucket
+    s3 = boto3.client("s3", 
+        region_name=os.getenv("REGION_NAME"),
+        aws_access_key_id=os.getenv("S3_KEY"),
+        aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
+    BUCKET_NAME = os.getenv("S3_BUCKET")
+    
     try:
         s3.upload_file(filename, BUCKET_NAME, filename)
         result = 'uploaded to S3'
@@ -231,56 +346,29 @@ def upload_to_s3(filename, BUCKET_NAME):
 
 load_dotenv()
 
-# access s3 bucket
-s3 = boto3.client("s3", 
-    region_name=os.getenv("REGION_NAME"),
-    aws_access_key_id=os.getenv("S3_KEY"),
-    aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
-BUCKET_NAME = os.getenv("S3_BUCKET")
+# iOS工程師, Android工程師, 前端工程師, 後端工程師, 全端工程師
+# 數據分析師, 資料科學家, 資料工程師, AI工程師, 資料庫管理人員
+category_list = ['2007001013','2007001014','2007001015','2007001016','2007001017', \
+                '2007001018','2007001021','2007001022','2007001020','2007002002']
 
-# Connect to MySQL database
-db_mysql_conn = pymysql.connect(host=os.getenv("MYSQL_HOST"),
-                                user=os.getenv("MYSQL_USER"),
-                                password=os.getenv("MYSQL_PASSWORD"),
-                                database=os.getenv("MYSQL_DB"),
-                                charset='utf8mb4',
-                                cursorclass=pymysql.cursors.DictCursor)
+# category_list = ['2007001023']
+# category_list = ['2007001016', \
+#                 '2007001018','2007001021','2007001022','2007001020','2007002002']
 
-# # Connect to AWS RDS
-# db_mysql_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
-#                                 user=os.getenv("RDS_USER"),
-#                                 password=os.getenv("RDS_PASSWORD"),
-#                                 database=os.getenv("RDS_DB"),
-#                                 charset='utf8mb4',
-#                                 cursorclass=pymysql.cursors.DictCursor)
+for category in category_list:
+    all_job_codes = crawl_all_id(driver, category)
+    print(f"Total {category} job codes:", len(all_job_codes))
 
-cursor = db_mysql_conn.cursor()
+    all_jd = get_all_jd(all_job_codes)
+    print(f"Total {category} jds:", len(all_jd))
 
-all_job_codes = crawl_id_all_pages(driver)
-print("Total job codes:", len(all_job_codes))
+    insert_sql(all_jd)
+    print(f'inserted {category} all jd')
 
-all_jds = []
-for j_code in all_job_codes:
-    jd = get_job(j_code)
-    insert_sql(jd)
+    all_jd_filename = list_to_json(all_jd, category)
+    result = upload_to_s3(all_jd_filename)
+    print(f"uploaded to today's {category} jd to s3")
 
-    all_jds.append(jd)
-    time.sleep(1)
-
-all_jd_filename = list_to_json(all_jds)
-result = upload_to_s3(all_jd_filename, BUCKET_NAME)
-print(result)
-
-#     time.sleep(1)
-# print('got all jd')
-
-# for j_code in all_job_codes:
-#     jd, jd_s3 = get_job(j_code)
-#     insert_sql(jd)
-#     time.sleep(1)
-
-job_malay = get_job("889kc")
-print(job_malay)
-
-db_mysql_conn.close()
 driver.quit()
+
+print("Done")

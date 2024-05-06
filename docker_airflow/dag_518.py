@@ -17,6 +17,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 
+from airflow.decorators import dag
+from datetime import datetime
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
+
 load_dotenv()
 
 headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}
@@ -68,13 +73,12 @@ def crawl_all_pages(driver):
                 break
             driver.execute_script("arguments[0].click();", next_button)
 
-            # Wait for the next page to load
-            time.sleep(3)  # Adjust this delay according to your page load time
+            time.sleep(3)
 
             job_codes_per_page = crawl_each_page(driver)
             all_job_links.extend(job_codes_per_page)
         except NoSuchElementException:
-            break  # Exit the loop if the "Next Page" button is not found
+            break
 
     return all_job_links
 
@@ -206,13 +210,6 @@ def insert_sql(one_jd):
     # Execute the bulk insert
     cursor.execute(insert_query, job_data)
     db_conn.commit()
-
-    # Prepare the query for bulk insertion for job categories
-    # category_query =  """
-    #     INSERT INTO job_category (job_code, job_category)
-    #     VALUES (%s, %s)
-    #     ON DUPLICATE KEY UPDATE job_category = VALUES(job_category)
-    #     """
     
     category_query =  """
         INSERT IGNORE INTO job_category (job_code, job_category)
@@ -223,20 +220,22 @@ def insert_sql(one_jd):
         cursor.execute(category_query, (one_jd[1], j_category))
         db_conn.commit()
 
-# j_links = crawl_all_pages(driver)
-# print(len(j_links))
 
-# i = 0
-# for j_link in j_links:
-#     jd = get_job(j_link)
-#     insert_sql(jd)
-#     time.sleep(0.5)
-#     i += 1
+
+j_links = crawl_all_pages(driver)
+print(len(j_links))
+
+i = 0
+for j_link in j_links:
+    jd = get_job(j_link)
+    insert_sql(jd)
+    time.sleep(0.5)
+    i += 1
 
 # print(i)
 
-single_jd = get_job("https://www.518.com.tw/job-GQwxr6.html")
-insert_sql(single_jd)
-print(single_jd)
+# single_jd = get_job("https://www.518.com.tw/job-GQwxr6.html")
+# insert_sql(single_jd)
+# print(single_jd)
 
 driver.quit()
