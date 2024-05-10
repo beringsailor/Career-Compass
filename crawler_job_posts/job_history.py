@@ -47,7 +47,7 @@ for job in job_list:
 
 # get date for history data
 tw_time = datetime.now(UTC) + timedelta(hours=8)
-tw_date = tw_time.date()
+tw_date = tw_time.date() - timedelta(days=3)
 insert_data.append(tw_date)
 
 print(insert_data)

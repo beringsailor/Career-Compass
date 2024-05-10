@@ -1,3 +1,8 @@
+from airflow import DAG
+from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
+
+import boto3
 import time
 import random
 import requests
@@ -5,7 +10,7 @@ import re
 import os
 import pymysql
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service 
@@ -17,25 +22,34 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 
-from airflow.decorators import dag
-from datetime import datetime
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator
-
 load_dotenv()
 
-headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}
+##### logging  #####
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# to prevent ERROR:cert_issuer_source_aia.cc(35)
-options = webdriver.ChromeOptions()
-options.add_experimental_option('excludeSwitches', ['enable-logging'])
-# driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-driver = webdriver.Remote("http://127.0.0.1:4444/wd/hub", service=Service(ChromeDriverManager().install()), options=options)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler('crawler_518_dag.log')
+file_handler.setFormatter(formatter)
 
-# all IT jobs
-driver.get("https://www.518.com.tw/job-index.html?ab=2032001")
+logger.addHandler(file_handler)
 
-# crawl job_ids of each page
+logger.info('Start crawler_518.py')
+
+# s3 and database
+s3 = boto3.client("s3", 
+    region_name=os.getenv("REGION_NAME"),
+    aws_access_key_id=os.getenv("S3_KEY"),
+    aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
+BUCKET_NAME = os.getenv("S3_BUCKET")
+
+db_host=os.getenv("RDS_HOST")
+db_user=os.getenv("RDS_USER")
+db_password=os.getenv("RDS_PASSWORD")
+db_database=os.getenv("RDS_DB")
+
+###
+
 def crawl_each_page(driver):
     job_links_per_page = []
 
@@ -49,9 +63,9 @@ def crawl_each_page(driver):
             job_link = a_tag.get_attribute("href")
             if job_link:
                 job_links_per_page.append(job_link)
-                print(job_link)
+                logging.info(job_link)
             else:
-                logging.warning("No job link found for post: %s", post.text)
+                logging.error("No job link found for post: %s", post.text)
     except StaleElementReferenceException:
         # Retry if a stale element reference exception occurs
         return crawl_each_page(driver)
@@ -73,16 +87,17 @@ def crawl_all_pages(driver):
                 break
             driver.execute_script("arguments[0].click();", next_button)
 
-            time.sleep(3)
+            # Wait for the next page to load
+            time.sleep(3)  # Adjust this delay according to your page load time
 
             job_codes_per_page = crawl_each_page(driver)
             all_job_links.extend(job_codes_per_page)
         except NoSuchElementException:
-            break
+            break  # Exit the loop if the "Next Page" button is not found
 
     return all_job_links
 
-def get_job(url):
+def get_job(driver, url):
     driver.get(url)
 
     match = re.search(r'job-(\w+)\.html', url)
@@ -94,7 +109,7 @@ def get_job(url):
     job_code = job_code
     job_title = None
     company_name = None
-    salary = None
+    salary_info = None
     job_location = None
     job_category = None
     work_experience = None
@@ -170,8 +185,9 @@ def get_job(url):
 
 def insert_sql(one_jd):
     # get taiwan date when inserting
-    tw_time = datetime.now(UTC) + timedelta(hours=8)
+    tw_time = datetime.now(timezone.utc) + timedelta(hours=8)
     tw_date = tw_time.date()
+    logger.info(tw_date)
 
     db_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
                             user=os.getenv("RDS_USER"),
@@ -179,63 +195,113 @@ def insert_sql(one_jd):
                             database=os.getenv("RDS_DB"),
                             charset='utf8mb4',
                             cursorclass=pymysql.cursors.DictCursor)
-    cursor = db_conn.cursor()
+    if db_conn:
+        cursor = db_conn.cursor()
 
-    insert_query = """
-        INSERT INTO job (job_title, job_code, company_name, job_location, salary_period, 
-                        min_salary, max_salary, edu_level, work_experience, skills, 
-                        travel, management, remote, job_source, create_date)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE
-                        job_title = VALUES(job_title),
-                        company_name = VALUES(company_name),
-                        job_location = VALUES(job_location),
-                        salary_period = VALUES(salary_period),
-                        min_salary = VALUES(min_salary),
-                        max_salary = VALUES(max_salary),
-                        edu_level = VALUES(edu_level),
-                        work_experience = VALUES(work_experience),
-                        skills = VALUES(skills),
-                        travel = VALUES(travel),
-                        management = VALUES(management),
-                        remote = VALUES(remote),
-                        job_source = VALUES(job_source),
-                        create_date = VALUES(create_date)
-    """
-
-    job_data = [one_jd[0],one_jd[1],one_jd[2],one_jd[3],one_jd[4], \
-                one_jd[5],one_jd[6],one_jd[7],one_jd[8],one_jd[9], \
-                one_jd[10],one_jd[11],one_jd[12],one_jd[13],tw_date]
-    
-    # Execute the bulk insert
-    cursor.execute(insert_query, job_data)
-    db_conn.commit()
-    
-    category_query =  """
-        INSERT IGNORE INTO job_category (job_code, job_category)
-        VALUES (%s, %s)
+        insert_query = """
+            INSERT INTO job (job_title, job_code, company_name, job_location, salary_period, 
+                            min_salary, max_salary, edu_level, work_experience, skills, 
+                            travel, management, remote, job_source, create_date)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON DUPLICATE KEY UPDATE
+                            job_title = VALUES(job_title),
+                            company_name = VALUES(company_name),
+                            job_location = VALUES(job_location),
+                            salary_period = VALUES(salary_period),
+                            min_salary = VALUES(min_salary),
+                            max_salary = VALUES(max_salary),
+                            edu_level = VALUES(edu_level),
+                            work_experience = VALUES(work_experience),
+                            skills = VALUES(skills),
+                            travel = VALUES(travel),
+                            management = VALUES(management),
+                            remote = VALUES(remote),
+                            job_source = VALUES(job_source),
+                            create_date = VALUES(create_date)
         """
 
-    for j_category in one_jd[14]:
-        cursor.execute(category_query, (one_jd[1], j_category))
+        job_data = [one_jd[0],one_jd[1],one_jd[2],one_jd[3],one_jd[4], \
+                    one_jd[5],one_jd[6],one_jd[7],one_jd[8],one_jd[9], \
+                    one_jd[10],one_jd[11],one_jd[12],one_jd[13],tw_date]
+        
+        # Execute the bulk insert
+        cursor.execute(insert_query, job_data)
         db_conn.commit()
 
+        # Prepare the query for bulk insertion for job categories
+        # category_query =  """
+        #     INSERT INTO job_category (job_code, job_category)
+        #     VALUES (%s, %s)
+        #     ON DUPLICATE KEY UPDATE job_category = VALUES(job_category)
+        #     """
+        
+        category_query =  """
+            INSERT IGNORE INTO job_category (job_code, job_category)
+            VALUES (%s, %s)
+            """
 
+        for j_category in one_jd[14]:
+            cursor.execute(category_query, (one_jd[1], j_category))
+            db_conn.commit()
+    else:
+        logger.error("failed to connect to db")
 
-j_links = crawl_all_pages(driver)
-print(len(j_links))
+def crawler_518():
+    # start web driver
+    # driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    options = webdriver.ChromeOptions()
 
-i = 0
-for j_link in j_links:
-    jd = get_job(j_link)
-    insert_sql(jd)
-    time.sleep(0.5)
-    i += 1
+    remote_url = 'http://remote_chromedriver:4444/wd/hub'
+    driver = webdriver.Remote(command_executor=remote_url, keep_alive=True, options=options)
 
-# print(i)
+    try:
+        driver.get("https://www.518.com.tw/job-index.html?ab=2032001,2032002")
 
-# single_jd = get_job("https://www.518.com.tw/job-GQwxr6.html")
-# insert_sql(single_jd)
-# print(single_jd)
+        j_links = crawl_all_pages(driver)
+        logger.info(j_links)
+        logger.info(len(j_links))
 
-driver.quit()
+        i = 0
+        for j_link in j_links:
+            try:
+                logger.info(j_link)
+                jd = get_job(driver, j_link)
+                logger.info(jd)
+                if jd:
+                    insert_sql(jd)
+                    logger.info("inserted jd")
+                    logger.info(jd)
+                    time.sleep(0.5)
+            except Exception as e:
+                logger.error("exception when inserting jd", e)
+            i += 1
+    except Exception as e:
+        logger.error("Fail to get job link", e)
+    finally:
+        driver.quit()
+
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5)
+}
+
+with DAG(
+    dag_id='crawler_518_trial',
+    # schedule="0 5 * * *",  # Run the DAG daily at 05:00 UTC
+    start_date=datetime.today(),
+    default_args=default_args,
+    catchup=False,
+    tags=['crawler', '518', 'daily']
+) as dag:
+    t1 = PythonOperator(
+        task_id='518_crawler',
+        python_callable=crawler_518,
+        dag=dag
+    )
+
+    (t1)
+

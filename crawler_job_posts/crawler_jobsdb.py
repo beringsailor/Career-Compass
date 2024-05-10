@@ -5,7 +5,7 @@ import time
 import json
 import pymysql
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service 
@@ -57,7 +57,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 def crawl_job_codes():
     all_job_codes = []
 
-    driver.get("https://hk.jobsdb.com/jobs?classification=6281")
+    driver.get("https://hk.jobsdb.com/jobs?classification=1210")
 
     # for page_number in range(20,21):
     #     driver.get(f"https://hk.jobsdb.com/jobs-in-information-communication-technology?page={page_number}")
@@ -149,7 +149,7 @@ def get_gemini_summary(content):
         "資料庫管理人員", "MIS／網管主管", "資安主管"]
 
     # get taiwan date when inserting
-    tw_time = datetime.now(UTC) + timedelta(hours=8)
+    tw_time = datetime.now(timezone.utc) + timedelta(hours=8)
     tw_date = tw_time.date()
     
     prompt = f"""
@@ -224,7 +224,7 @@ def get_openai_summary(content):
         "資料庫管理人員", "MIS／網管主管", "資安主管"]
 
     # get taiwan date when inserting
-    tw_time = datetime.now(UTC) + timedelta(hours=8)
+    tw_time = datetime.now(timezone.utc) + timedelta(hours=8)
     tw_date = tw_time.date()
 
     completion = client.chat.completions.create(
@@ -366,7 +366,7 @@ for job_code in job_codes:
     except Exception as e:
         logging.error(f"Failed to process job {job_code}: {e}")
         continue
-    time.sleep(5)
+    time.sleep(1)
 
 driver.quit()
 

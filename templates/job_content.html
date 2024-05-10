@@ -12,32 +12,35 @@
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
         <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css">
         <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
+        <script>
+         function toggleBookmark(userId, jobCode) {
+            var bookmarkIcon = document.getElementById('bookmarkIcon-' + jobCode);
+            // Send AJAX request to Flask API
+            fetch('/bookmark/' + userId + '/' + jobCode)
+               .then(response => {
+                     if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                     }
+                     return response.json();
+               })
+               .then(data => {
+                     // Update icon and text based on response
+                     if (data.action === 'add') {
+                        bookmarkIcon.src = "{{ url_for('static', filename='star_filled.png') }}";
+                        // bookmarkIcon.parentNode.querySelector('p').textContent = '已收藏';
+                     } else {
+                        bookmarkIcon.src = "{{ url_for('static', filename='star_empty.png') }}";
+                        // bookmarkIcon.parentNode.querySelector('p').textContent = '未收藏';
+                     }
+               })
+               .catch(error => {
+                     console.error('There was a problem with the fetch operation:', error);
+               });
+         }
+        </script>
     </head>
     <body>
-        <header>
-            <nav class="top-bar">
-                <div class="container-top">
-                    <a href="{{ url_for('homepage') }}">
-                        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100" height="43">
-                    </a>
-                    <ul class="nav item_ul">
-                        <li class="item">
-                            <a href="{{ url_for('search_jobs_get') }}">搜尋職缺</a>
-                        </li>
-                        <li class="item">
-                            <a href="{{ url_for('dashboard') }}">職業觀測站</a>
-                        </li>
-                        <li class="item">
-                            {% if name %}
-                                <a href="{{ url_for('profile') }}" data-userid="{{ user_id }}">{{ name }}</a>
-                            {% else %}
-                                <a href="{{ url_for('get_login_page') }}">登入 / 註冊</a>
-                            {% endif %}
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-        </header>
+        {% include 'nav_bar.html' %}
         
         <div class="container d-flex justify-content-center mt-50 mb-50 flex-container-1">
             <div class="main-job">
@@ -48,33 +51,50 @@
                    <br>
                    <figure class="card card-product-grid card-lg item">
                       <figcaption class="info-wrap">
-                         <div class="row">
-                            <div class="col-md-9 col-xs-9">
-                               <a href="#" class="title" data-abc="true">
-                                  <h3>{{ result.job_title }}</h3>
-                               </a>
-                               <span class="rated"></span> 
-                            </div>
-                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">公司：{{ result.company_name }}</a> <span class="rated"></span> </div>
-                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">地址：{{ result.job_location }}</a> <span class="rated"></span> </div>
-                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">薪資：{{ result.salary_period }}</a> <span class="rated">==</span> </div>
-                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">學歷：{{ result.edu_level }}</a> <span class="rated"></span> </div>
-                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">年資：{{ result.work_experience }}</a> <span class="rated"></span> </div>
-                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">技能：{{ result.skills }}</a> <span class="rated"></span> </div>
-                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">是否可遠端：{{ result.remote }}</a> <span class="rated"></span> </div>
-                            <!-- <div class="col-md-3 col-xs-3">
-                               <div class="rating text-right"> <i class="fa fa-star"></i> <i class="fa fa-star"></i> <i class="fa fa-star"></i> <i class="fa fa-star"></i> <span class="rated">Rated 4.0/5</span> </div>
-                               </div> -->
-                         </div>
+                        <div class="row">
+                           <div class="col-md-9 col-xs-9">
+                              <a href="#" class="title" data-abc="true">
+                                 <h3>{{ result.job_title }}</h3>
+                              </a>
+                              <span class="rated"></span>
+                           </div>
+                           <div class="col-md-3 col-xs-3">
+                              {% if name %}
+                                    {% if result.job_code in bookmarked_list %}
+                                    <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ result.job_code }}')">
+                                       <img id="bookmarkIcon-{{ result.job_code }}" src="{{ url_for('static', filename='star_filled.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                       <!-- <p>已收藏</p> -->
+                                    </a>
+                                    {% else %}
+                                    <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ result.job_code }}')">
+                                       <img id="bookmarkIcon-{{ result.job_code }}" src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                       <!-- <p>未收藏</p> -->
+                                    </a>
+                                    {% endif %}
+                              {% else %}
+                                    <a href="{{ url_for('get_login_page') }}">
+                                       <img src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
+                                       <!-- <p>未收藏</p> -->
+                                    </a>
+                              {% endif %}
+                           </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">公司：{{ result.company_name }}</a> <span class="rated"></span> </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">地址：{{ result.job_location }}</a> <span class="rated"></span> </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">薪資：{{ result.salary_period }}</a> <span class="rated">==</span> </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">學歷：{{ result.edu_level }}</a> <span class="rated"></span> </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">年資：{{ result.work_experience }}</a> <span class="rated"></span> </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">技能：{{ result.skills }}</a> <span class="rated"></span> </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">是否可遠端：{{ result.remote }}</a> <span class="rated"></span> </div>
+                        </div>
                       </figcaption>
                       <div class="bottom-wrap-payment">
                          <figcaption class="info-wrap">
                             <div class="row">
                                <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">管理責任：{{ result.management }}</a> <span class="rated"></span> </div>
                                <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">出差外派：{{ result.travel }}</a> <span class="rated"></span> </div>
-                               <div class="col-md-3 col-xs-3">
+                               <!-- <div class="col-md-3 col-xs-3">
                                   <div class="rating text-right"> #### 8787 </div>
-                               </div>
+                               </div> -->
                             </div>
                          </figcaption>
                       </div>

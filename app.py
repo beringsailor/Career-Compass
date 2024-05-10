@@ -221,7 +221,7 @@ def get_jd(user_id, job_code):
 
         conn.close()
 
-    return render_template('job_content.html', results=results, \
+    return render_template('job_content.html', results=results, user_id=user_id, \
                            sides=sides, name=name, bookmarked_list=bookmarked_list)
 
 @server.route('/user/login', methods=['GET'])
@@ -330,7 +330,6 @@ def profile(user_id):
             account = cursor.fetchall()
             data = account
             name = account[0]['name']
-            # return jsonify({"data":data})
             return render_template('profile.html', data=data, name=name)
         except Exception as e:
             logging.error("user profile api error")
@@ -340,6 +339,8 @@ def profile(user_id):
 def dashboard(user_id=None):
     conn = connect_db()
     cursor = conn.cursor()
+
+    name = None
     # Example of different content based on login status
     if user_id:
         query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
@@ -353,10 +354,6 @@ def dashboard(user_id=None):
 
         conn.close()
     return render_template('dashboard.html', name=name)
-
-@server.route('/dashapp/')
-def render_dashboard():
-    return flask.redirect('/dash')
 
 @server.route('/api/dashboard/job_vacancy', methods=['POST'])
 def get_vacancy_ratio():

@@ -26,10 +26,10 @@
                         // Update icon and text based on response
                         if (data.action === 'add') {
                             bookmarkIcon.src = "{{ url_for('static', filename='star_filled.png') }}";
-                            bookmarkIcon.parentNode.querySelector('p').textContent = '已收藏';
+                            // bookmarkIcon.parentNode.querySelector('p').textContent = '已收藏';
                         } else {
                             bookmarkIcon.src = "{{ url_for('static', filename='star_empty.png') }}";
-                            bookmarkIcon.parentNode.querySelector('p').textContent = '未收藏';
+                            // bookmarkIcon.parentNode.querySelector('p').textContent = '未收藏';
                         }
                     })
                     .catch(error => {
@@ -39,30 +39,7 @@
         </script>
     </head>
     <body>
-        <header>
-            <nav class="top-bar">
-                <div class="container-top">
-                    <a href="{{ url_for('homepage') }}">
-                        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100" height="43">
-                    </a>
-                    <ul class="nav item_ul">
-                        <li class="item">
-                            <a href="{{ url_for('search_jobs_get') }}">搜尋職缺</a>
-                        </li>
-                        <li class="item">
-                            <a href="{{ url_for('dashboard') }}">職業觀測站</a>
-                        </li>
-                        <li class="item">
-                            {% if name %}
-                                <a href="{{ url_for('profile') }}" data-userid="{{ user_id }}">{{ name }}</a>
-                            {% else %}
-                                <a href="{{ url_for('get_login_page') }}">登入 / 註冊</a>
-                            {% endif %}
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-        </header>
+        {% include 'nav_bar.html' %}
         
         <div class="second-bar">
             <div class="container-second">
@@ -128,18 +105,18 @@
                                         {% if job.job_code in bookmarked_list %}
                                         <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
                                             <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_filled.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                            <p>已收藏</p>
+                                            <!-- <p>已收藏</p> -->
                                         </a>
                                         {% else %}
                                         <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
                                             <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                            <p>未收藏</p>
+                                            <!-- <p>未收藏</p> -->
                                         </a>
                                         {% endif %}
                                     {% else %}
                                         <a href="{{ url_for('get_login_page') }}">
                                             <img src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                            <p>未收藏</p>
+                                            <!-- <p>未收藏</p> -->
                                         </a>
                                     {% endif %}
                                 </div>
@@ -188,18 +165,18 @@
                                         {% if job.job_code in bookmarked_list %}
                                         <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
                                             <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_filled.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                            <p>已收藏</p>
+                                            <!-- <p>已收藏</p> -->
                                         </a>
                                         {% else %}
                                         <a href="#" onclick="toggleBookmark('{{ user_id }}','{{ job.job_code }}')">
                                             <img id="bookmarkIcon-{{ job.job_code }}" src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                            <p>未收藏</p>
+                                            <!-- <p>未收藏</p> -->
                                         </a>
                                         {% endif %}
                                     {% else %}
                                         <a href="{{ url_for('get_login_page') }}">
                                             <img src="{{ url_for('static', filename='star_empty.png') }}" alt="Icon" style="width: 25px; height: 25px;">
-                                            <p>未收藏</p>
+                                            <!-- <p>未收藏</p> -->
                                         </a>
                                     {% endif %}
                                 </div>

@@ -1,0 +1,22 @@
+<nav class="top-bar">
+    <div class="container-top">
+       <a href="{{ url_for('homepage') }}">
+          <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="100" height="43">
+       </a>
+       <ul class="nav item_ul">
+          <li class="item">
+                <a href="{{ url_for('search_jobs_get') }}">搜尋職缺</a>
+          </li>
+          <li class="item">
+                <a href="{{ url_for('dashboard') }}">職業觀測站</a>
+          </li>
+          <li class="item">
+                {% if name %}
+                   <a href="{{ url_for('profile') }}" data-userid="{{ user_id }}">{{ name }}</a>
+                {% else %}
+                   <a href="{{ url_for('get_login_page') }}">登入 / 註冊</a>
+                {% endif %}
+          </li>
+       </ul>
+    </div>
+</nav>

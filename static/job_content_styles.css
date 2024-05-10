@@ -198,3 +198,11 @@ a{
     align-items: center;
     justify-content: space-between;
 }
+
+.col-md-3.col-xs-3 {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+  

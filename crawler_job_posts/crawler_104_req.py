@@ -1,19 +1,17 @@
-from airflow import DAG
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator
-
-import boto3
-import time
-import json
-import random
-import requests
 import re
 import os
-import pymysql
+import time
+import json
+import boto3
+import random
 import logging
+import requests
+import pymysql
 import concurrent.futures
-from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
+
+start_time = datetime.now()
 
 load_dotenv()
 
@@ -28,18 +26,6 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 logger.info('Start crawler_104.py')
-
-# s3 and database
-s3 = boto3.client("s3", 
-    region_name=os.getenv("REGION_NAME"),
-    aws_access_key_id=os.getenv("S3_KEY"),
-    aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
-BUCKET_NAME = os.getenv("S3_BUCKET")
-
-db_host=os.getenv("RDS_HOST")
-db_user=os.getenv("RDS_USER")
-db_password=os.getenv("RDS_PASSWORD")
-db_database=os.getenv("RDS_DB")
 
 def get_all_jcodes():
     """search jobs on 104"""
@@ -70,7 +56,7 @@ def get_all_jcodes():
                 
                 data = r.json()
                 # total_count = data['data']['totalCount']
-                # logging.info(len(data['data']['list']))
+                logging.info(len(data['data']['list']))
                 if len(data['data']['list']) == 0:
                     break
 
@@ -82,8 +68,9 @@ def get_all_jcodes():
                         job_code = match.group(1)
                         if job_code not in total_jcodes:
                             total_jcodes.append(job_code)
-                        # logging.info(job_code)
+                        logging.info(job_code)
                 page +=1
+                # print(data['data']['list'])
     except Exception as e:
         logging.error("fail to get job code from category list")
 
@@ -201,6 +188,7 @@ def insert_sql(all_jd_list):
         # get taiwan date when inserting
         tw_time = datetime.now(timezone.utc) + timedelta(hours=8)
         tw_date = tw_time.date()
+
         # insert temp_jobs
         cursor.execute("""
             CREATE TEMPORARY TABLE temp_job LIKE job;
@@ -294,16 +282,19 @@ def insert_sql(all_jd_list):
         db_mysql_conn.commit()
         logger.info("jobcat upserted")
 
-        # #  delete records from main table that are not in the temporary table
+        # print(all_temp_code)
+
+        # delete records from main table that are not in the temporary table
+        # ERROR:root:Error updating data table: (1205, 'Lock wait timeout exceeded; try restarting transaction')
         # sql_delete = """
         # DELETE FROM job
         # WHERE job_source LIKE '%www.104.com%'
+        # AND create_date < '2024-05-08 00:00:00'
         # AND job_code NOT IN (
         #     SELECT job_code
         #     FROM temp_job
         # );
         # """
-        # cursor.execute(sql_delete)
 
         sql_temp_job = "SELECT job_code FROM temp_job"
         cursor.execute(sql_temp_job)
@@ -346,11 +337,18 @@ def list_to_json(input_list):
 
     filename = f"jd_104_{tw_date}.json"
     with open(filename, "w", encoding="utf-8") as json_file:
-        json.dump(modified_data, json_file, ensure_ascii=False, indent=4)
+        json.dump(input_list, json_file, ensure_ascii=False, indent=4)
 
     return filename
 
 def upload_to_s3(filename):
+    # access s3 bucket
+    s3 = boto3.client("s3", 
+        region_name=os.getenv("REGION_NAME"),
+        aws_access_key_id=os.getenv("S3_KEY"),
+        aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
+    BUCKET_NAME = os.getenv("S3_BUCKET")
+    
     try:
         s3.upload_file(filename, BUCKET_NAME, filename)
         result = 'uploaded to S3'
@@ -358,49 +356,22 @@ def upload_to_s3(filename):
     except Exception as e:
         return {"errors": str(e)}
 
-def crawler_104():
-    try:
-        total_codes = get_all_jcodes()
-        logger.info('total job_codes: ', len(total_codes))
+total_codes = get_all_jcodes()
+logger.info(f'total job_codes: {len(total_codes)}')
 
-        all_jd = get_all_jd(total_codes)
-        logger.info('total jds: ', len(all_jd))
+all_jd = get_all_jd(total_codes)
+logger.info(f'total jds: {len(all_jd)}')
 
-        insert_sql(all_jd)
-        logger.info("inserted all 104 jd to db")
+insert_sql(all_jd)
+logger.info("inserted all 104 jd to db")
 
-        all_jd_json = list_to_json(all_jd)
-        logger.info("transformed all jd to json")
+all_jd_json = list_to_json(all_jd)
+logger.info("transformed all jd to json")
 
-        upload_to_s3(all_jd_json)
-        logger.info("uploaded today's 104 json")
+upload_to_s3(all_jd_json)
+logger.info("uploaded today's 104 json")
 
-        logger.info("Done")
-    except Exception as e:
-        logger.error("crawler bug", e)
+logger.info("Done")
 
-default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5)
-}
-
-with DAG(
-    dag_id='crawler_104',
-    schedule="0 5 * * *",  # Run the DAG daily at 05:00 UTC
-    start_date=datetime.today(),
-    default_args=default_args,
-    catchup=False,
-    tags=['crawler', '104', 'daily']
-    ) as dag:
-
-    t1 = PythonOperator(
-        task_id='104_crawler',
-        python_callable=crawler_104,
-        dag=dag
-    )
-
-    (t1)
+end_time = datetime.now()
+logger.info(f"start and end time: {start_time}, {end_time}")

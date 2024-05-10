@@ -3,6 +3,7 @@ import random
 import requests
 import re
 import os
+import logging
 import pymysql
 import logging
 from datetime import datetime, timedelta, UTC
@@ -19,16 +20,29 @@ from selenium.webdriver.support import expected_conditions as EC
 
 load_dotenv()
 
+##### logging  #####
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler('crawler_104_dag.log')
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
+
+logger.info('Start crawler_104.py')
+
+# start crawling
 headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}
 
 # to prevent ERROR:cert_issuer_source_aia.cc(35)
 options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
-# driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-driver = webdriver.Remote("http://127.0.0.1:4444/wd/hub", service=Service(ChromeDriverManager().install()), options=options)
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+# driver = webdriver.Remote("http://127.0.0.1:4444/wd/hub", service=Service(ChromeDriverManager().install()), options=options)
 
 # all IT jobs
-driver.get("https://www.518.com.tw/job-index.html?ab=2032001")
+driver.get("https://www.518.com.tw/job-index.html?ab=2032001,2032002")
 
 # crawl job_ids of each page
 def crawl_each_page(driver):
@@ -44,9 +58,9 @@ def crawl_each_page(driver):
             job_link = a_tag.get_attribute("href")
             if job_link:
                 job_links_per_page.append(job_link)
-                print(job_link)
+                logging.info(job_link)
             else:
-                logging.warning("No job link found for post: %s", post.text)
+                logging.error("No job link found for post: %s", post.text)
     except StaleElementReferenceException:
         # Retry if a stale element reference exception occurs
         return crawl_each_page(driver)
@@ -176,7 +190,7 @@ def insert_sql(one_jd):
                             charset='utf8mb4',
                             cursorclass=pymysql.cursors.DictCursor)
     cursor = db_conn.cursor()
-
+    
     insert_query = """
         INSERT INTO job (job_title, job_code, company_name, job_location, salary_period, 
                         min_salary, max_salary, edu_level, work_experience, skills, 
@@ -223,20 +237,20 @@ def insert_sql(one_jd):
         cursor.execute(category_query, (one_jd[1], j_category))
         db_conn.commit()
 
-# j_links = crawl_all_pages(driver)
-# print(len(j_links))
+j_links = crawl_all_pages(driver)
+logging.info(len(j_links))
 
-# i = 0
-# for j_link in j_links:
-#     jd = get_job(j_link)
-#     insert_sql(jd)
-#     time.sleep(0.5)
-#     i += 1
+i = 0
+for j_link in j_links:
+    jd = get_job(j_link)
+    insert_sql(jd)
+    time.sleep(0.5)
+    i += 1
 
-# print(i)
+# logging.info(i)
 
-single_jd = get_job("https://www.518.com.tw/job-GQwxr6.html")
-insert_sql(single_jd)
-print(single_jd)
+# single_jd = get_job("https://www.518.com.tw/job-GQwxr6.html")
+# insert_sql(single_jd)
+# logging(single_jd)
 
 driver.quit()

@@ -26,10 +26,12 @@ from logging.handlers import TimedRotatingFileHandler
 # if not os.path.exists("Logs"):
 #     os.makedirs("Logs")
 
-# logger = logging.getLogger(__name__)
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%a, %d %b %Y %H:%M:%S')
-# handler = TimedRotatingFileHandler(filename='Logs/example.log', when='midnight', interval=1, backupCount=7)
-# logger.addHandler(handler)
+##### logging  #####
+logging.basicConfig(level=logging.INFO, \
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', \
+                    filename='crawler_104.log')
+logger = logging.getLogger(__name__)
+logger.info('Start crawler_518.py')
 
 # start crawling
 headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}
@@ -64,9 +66,9 @@ def crawl_all_id(driver, category):
                         if job_code not in all_job_codes:
                             all_job_codes.append(job_code)
                     else:
-                        logging.error("No job code found for post: %s", post.text)
+                        logger.error("No job code found for post: %s", post.text)
         except StaleElementReferenceException or WebDriverException as e:
-            logging.error(f"Error occurred: {e}")
+            logger.error(f"Error occurred: {e}")
 
         # turn page and crawl till last page
         try:
@@ -90,9 +92,9 @@ def crawl_all_id(driver, category):
                             if job_code not in all_job_codes:
                                 all_job_codes.append(job_code)
                         else:
-                            logging.error("No job code found for post: %s", post.text)
+                            logger.error("No job code found for post: %s", post.text)
             except StaleElementReferenceException or WebDriverException as e:
-                logging.error(f"Error occurred: {e}")
+                logger.error(f"Error occurred: {e}")
 
             # Wait for the next page to load
             time.sleep(1)
@@ -124,7 +126,6 @@ def get_all_jd(job_id_list):
             remote = None
             job_category = None
             url_to_104 = f'https://www.104.com.tw/job/{job_id}'
-            print(url_to_104)
 
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.92 Safari/537.36',
@@ -139,9 +140,8 @@ def get_all_jd(job_id_list):
                     try:
                         job_title = data['data']['header']['jobName']
                         company_name = data['data']['header']['custName']
-                        # only 3 characters? 
+                        # only 3 characters
                         job_location = data['data']['jobDetail']['addressRegion']
-                        print(job_location)
                         salary_info = data['data']['jobDetail']['salary']
                         min_salary = data['data']['jobDetail']['salaryMin']
                         max_salary = data['data']['jobDetail']['salaryMax']
@@ -173,11 +173,11 @@ def get_all_jd(job_id_list):
                         r.close()
                         time.sleep(0.01)
                     except Exception as e:
-                        logging.error(f'get 104 jd, {url} request failed', {e})
+                        logger.error(f'get 104 jd, {url} request failed', {e})
                 else:
-                    logging.error(f'did not get jd from {url}, posting is closed')
+                    logger.error(f'did not get jd from {url}, posting is closed')
         except Exception as e:
-            logging.error(f'get 104 jd, {url} request failed', {e})
+            logger.error(f'get 104 jd, {url} request failed', {e})
     return all_jds
 
 # insert each job to database
@@ -191,45 +191,6 @@ def insert_sql(all_jd_list):
                                     cursorclass=pymysql.cursors.DictCursor)
 
     cursor = db_mysql_conn.cursor()
-    
-    # # create temp table
-    # cursor.execute(
-    # """
-    # CREATE TEMPORARY TABLE `temp_job` (
-    #   id bigint unsigned NOT NULL AUTO_INCREMENT,
-    #   job_code varchar(255) NOT NULL,
-    #   job_title varchar(255) NOT NULL,
-    #   company_name varchar(255) NOT NULL,
-    #   job_location varchar(255) NOT NULL,
-    #   salary_period varchar(255) DEFAULT NULL,
-    #   min_salary bigint DEFAULT NULL,
-    #   max_salary bigint DEFAULT NULL,
-    #   edu_level varchar(255) DEFAULT NULL,
-    #   work_experience varchar(255) NOT NULL,
-    #   skills varchar(255) DEFAULT NULL,
-    #   travel varchar(255) DEFAULT NULL,
-    #   management varchar(255) DEFAULT NULL,
-    #   remote varchar(255) DEFAULT NULL,
-    #   job_source varchar(255) NOT NULL,
-    #   create_date timestamp NOT NULL,
-    #   PRIMARY KEY (id),
-    #   UNIQUE KEY temp_job_job_code_unique (job_code)
-    # )
-    # """
-    # )
-
-    # cursor.execute(
-    # """
-    # CREATE TEMPORARY TABLE `temp_job_category` (
-    # `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-    # `job_code` varchar(255) NOT NULL,
-    # `job_category` varchar(255) NOT NULL,
-    # PRIMARY KEY (`id`),
-    # KEY `idx_job_code` (`job_code`),
-    # CONSTRAINT `job_category_job_code_foreign` FOREIGN KEY (`job_code`) REFERENCES `job` (`job_code`)
-    # )
-    # """
-    # )
 
     # get taiwan date when inserting
     tw_time = datetime.now(UTC) + timedelta(hours=8)
@@ -357,18 +318,18 @@ category_list = ['2007001013','2007001014','2007001015','2007001016','2007001017
 
 for category in category_list:
     all_job_codes = crawl_all_id(driver, category)
-    print(f"Total {category} job codes:", len(all_job_codes))
+    logger.info(f"Total {category} job codes:", len(all_job_codes))
 
     all_jd = get_all_jd(all_job_codes)
-    print(f"Total {category} jds:", len(all_jd))
+    logger.info(f"Total {category} jds:", len(all_jd))
 
     insert_sql(all_jd)
-    print(f'inserted {category} all jd')
+    logger.info(f'inserted {category} all jd')
 
     all_jd_filename = list_to_json(all_jd, category)
     result = upload_to_s3(all_jd_filename)
-    print(f"uploaded to today's {category} jd to s3")
+    logger.info(f"uploaded to today's {category} jd to s3")
 
 driver.quit()
 
-print("Done")
+logger.info("Done for crawling 104")
