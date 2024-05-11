@@ -25,12 +25,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler = logging.FileHandler('crawler_104_dag.log')
+file_handler = logging.FileHandler('crawler_518_dag.log')
 file_handler.setFormatter(formatter)
 
 logger.addHandler(file_handler)
 
-logger.info('Start crawler_104.py')
+logger.info('Start crawler_518.py')
 
 # start crawling
 headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36'}

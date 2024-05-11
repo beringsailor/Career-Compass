@@ -1,7 +1,3 @@
-from airflow import DAG
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator
-
 import re
 import os
 import ast
@@ -20,19 +16,9 @@ from datetime import datetime, timedelta, timezone
 # Used to securely store your API key
 import google.generativeai as genai
 
+start_time = datetime.now()
+
 load_dotenv()
-
-# s3 and database
-s3 = boto3.client("s3", 
-    region_name=os.getenv("REGION_NAME"),
-    aws_access_key_id=os.getenv("S3_KEY"),
-    aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
-BUCKET_NAME = os.getenv("S3_BUCKET")
-
-db_host=os.getenv("RDS_HOST")
-db_user=os.getenv("RDS_USER")
-db_password=os.getenv("RDS_PASSWORD")
-db_database=os.getenv("RDS_DB")
 
 GOOGLE_API_KEY=os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
@@ -56,17 +42,9 @@ def get_all_codes():
 
     while True:
         try:
-            # url = f"https://hk.jobsdb.com/jobs-in-government-defence?page={page_num}"
-            url = f"https://hk.jobsdb.com/jobs-in-information-communication-technology??daterange=14&page={page_num}"
+            url = f"https://hk.jobsdb.com/jobs-in-government-defence?page={page_num}"
+            # url = f"https://hk.jobsdb.com/jobs-in-information-communicat ion-technology?page={page_num}"
             response = requests.get(url)
-            if response.status_code != requests.codes.ok:
-                logger.error(f'job_code page request failed')
-                if response.status_code == 429:
-                    # Extract rate limit information from headers
-                    limit = response.headers.get('X-RateLimit-Limit')
-                    remaining = response.headers.get('X-RateLimit-Remaining')
-                    reset = response.headers.get('X-RateLimit-Reset')
-                    logger.error(f"X-RateLimit-Limit= {limit} , 'X-RateLimit-Remaining'={remaining}, 'X-RateLimit-Reset'={reset}")
             soup = BeautifulSoup(response.text, 'html.parser')
 
             job_articles = soup.find_all('article', class_='y735df0 y735df1 _1iz8dgs7i _1iz8dgs6e _1iz8dgs9q _1iz8dgs8m _1iz8dgsh _1iz8dgs66 _1iz8dgs5e _12jtennf _12jtennd _12jtenne _94v4w18 _94v4w1b _1iz8dgs32 _1iz8dgs35')
@@ -86,10 +64,11 @@ def get_all_codes():
                                 job_code = matches[0]
                                 # print(job_code)
                                 all_job_codes.append(job_code)
+                                # time.sleep(1)
                         else:
-                            logger.error("No job link found for post")
+                            logging.error("No job link found for post")
                     else:
-                        logger.error("No job a_tag")
+                        logging.error("No job a_tag")
                 logger.info(f"crawling page: {page_num}")
                 page_num +=1
             else:
@@ -108,20 +87,33 @@ def get_jd(job_code):
         jd = jd_ele.get_text(strip=True)
         jd_info = [job_code, jd]
     else:
-        logger.error(f"failed to get jd text for job code: {job_code}")
+        logger.error(f"No jd_ele on job page for job code {job_code}")
 
     return jd_info
 
 def get_all_jd(code_list):
     total_count = len(code_list)
     all_jd = []
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    #     future_to_code = {executor.submit(get_jd, job_code): job_code for job_code in code_list}
+    #     for future in concurrent.futures.as_completed(future_to_code):
+    #         job_code = future_to_code[future]
+    #         try:
+    #             jd_info = future.result()
+    #             if jd_info:
+    #                 all_jd.append(jd_info)
+    #                 # print(jd_info)
+    #             else:
+    #                 logger.error(f"No jd_ele on job page for job code {job_code}")
+    #         except Exception as e:
+    #             logger.error(f"Exception occurred for job code {job_code}: {e}")
     for index, job_code in enumerate(code_list):
         logger.info(f"Now getting {job_code} JD {index + 1} of {total_count}")
         try:
             jd = get_jd(job_code)
             if jd:
                 all_jd.append(jd)
-                time.sleep(1)
+                time.sleep(2)
         except Exception as e:
             logger.error(f"failed to get {job_code} raw_jd {index + 1} of {total_count}: {e}")
     return all_jd
@@ -197,6 +189,17 @@ def get_gemini_summary(content):
         logger.error(f"gemini failed to form dict response:{e}")
 
 def process_all_jd(all_jd):
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    #     # Submit jobs to the ThreadPoolExecutor
+    #     future_to_jd = {executor.submit(get_gemini_summary, jd): jd for jd in all_jd}
+    #     all_processed_jds = []
+    #     for future in concurrent.futures.as_completed(future_to_jd):
+    #         jd = future_to_jd[future]
+    #         try:
+    #             result = future.result()
+    #             all_processed_jds.append(result)
+    #         except Exception as e:
+    #             logging.error(f"Exception occurred while processing job description: {e}")
     total_count = len(all_jd)
     all_processed_jds = []
     for index, jd in enumerate(all_jd):
@@ -407,55 +410,38 @@ def insert_sql(all_jd_list):
         logger.error(f"Error updating data table: {e}")
         db_mysql_conn.rollback()
 
-def crawler_jobsdb():
-    try:
-        all_codes = get_all_codes()
-        logger.info(f"got all job codes:{len(all_codes)}")
+all_codes = get_all_codes()
+print("got all job codes:", len(all_codes))
 
-        all_jd = get_all_jd(all_codes)
-        logger.info(f"got all raw jd:{len(all_jd)}")
-        all_raw_jd = raw_jd_to_json(all_jd)
-        upload_to_s3(all_raw_jd)
-        logger.info("uploaded all raw_jd")
+all_jd = get_all_jd(all_codes)
+print("got all raw jd:",len(all_jd))
+all_raw_jd = raw_jd_to_json(all_jd)
+upload_to_s3(all_raw_jd)
+print("uploaded all raw_jd")
 
-        all_ok_jd = process_all_jd(all_jd)
-        logger.info(len(all_ok_jd))
-        logger.info(f"got all processed jd: {len(all_ok_jd)}")
-        logger.info(all_ok_jd)
-        insert_sql(all_ok_jd)
-        logger.info(f"inserted all processed jd: {len(all_ok_jd)}")
+all_ok_jd = process_all_jd(all_jd)
+print(len(all_ok_jd))
+print("got all processed jd:",len(all_ok_jd))
+insert_sql(all_ok_jd)
+print("inserted all processed jd:",len(all_ok_jd))
 
-        all_processed_jd = processed_jd_to_json(all_ok_jd)
-        upload_to_s3(all_processed_jd)
-        logger.info("uploaded processed_jd")
+all_processed_jd = processed_jd_to_json(all_ok_jd)
+upload_to_s3(all_processed_jd)
+print("uploaded processed_jd")
 
-        logger.info("Done")
-    except Exception as e:
-        logger.error(f"crawler bug: {e}")
+# #start running codes
+# all_job_codes = get_all_codes()
+# print(len(all_job_codes))
 
-default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5)
-}
+# for job_code in all_job_codes:
+#     try:
+#         jd = get_jd(job_code)
+#         data = get_gemini_summary(jd)
+#         insert_sql(data)
+#     except Exception as e:
+#         logging.error(f"Failed to process job {job_code}: {e}")
+#         continue
+#     # time.sleep(1)
 
-with DAG(
-    dag_id='crawler_jobsdb',
-    schedule="0 5 * * *",  # Run the DAG daily at 05:00 UTC
-    start_date=datetime.today(),
-    default_args=default_args,
-    catchup=False,
-    tags=['crawler', 'jobsdb', 'daily']
-    ) as dag:
-
-    t1 = PythonOperator(
-        task_id='jobsdb_crawler',
-        python_callable=crawler_jobsdb,
-        dag=dag
-    )
-
-    (t1)
-
+end_time = datetime.now()
+print("start and end time", start_time, end_time)

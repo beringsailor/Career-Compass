@@ -9,3 +9,4 @@ nohup.out
 aws_pp.pem
 pp_key.pem
 ssl/
+crawler_job_posts/
