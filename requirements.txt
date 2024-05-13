@@ -79,7 +79,6 @@ overrides==7.7.0
 packaging==23.2
 plotly==5.19.0
 plotly-express==0.4.1
-prometheus_client==0.20.0
 prompt-toolkit==3.0.43
 proto-plus==1.23.0
 protobuf==4.25.3
