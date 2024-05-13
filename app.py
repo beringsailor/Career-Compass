@@ -7,7 +7,7 @@ import re
 import jwt
 import logging
 import pymysql
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 import matplotlib.pyplot as plt
 from io import BytesIO
 from hashlib import sha256
@@ -290,7 +290,7 @@ def signup():
                 
                 payload = {
                     'user_id': lastrowid,
-                    'exp' : datetime.now(UTC) + timedelta(seconds=3600)
+                    'exp' : datetime.now(timezone.utc) + timedelta(seconds=3600)
                     }
                 token = jwt.encode(payload, SECRET, ALGORITHM)
 
@@ -327,7 +327,7 @@ def signin():
                 
                 payload = {
                     'user_id':account[0]['id'],
-                    'exp' : datetime.now(UTC) + timedelta(seconds=3600)
+                    'exp' : datetime.now(timezone.utc) + timedelta(seconds=3600)
                     }
                 token = jwt.encode(payload, SECRET, ALGORITHM)
 
