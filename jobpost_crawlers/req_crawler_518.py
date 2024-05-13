@@ -1,14 +1,11 @@
-from airflow import DAG
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator
-
-import boto3
 import time
 import random
 import requests
 import re
 import os
 import json
+import boto3
+import logging
 import pymysql
 import logging
 from bs4 import BeautifulSoup
@@ -24,24 +21,11 @@ logger = logging.getLogger(__name__)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler = logging.FileHandler('crawler_518_dag.log')
 file_handler.setFormatter(formatter)
-
 logger.addHandler(file_handler)
-
 logger.info('Start crawler_518.py')
 
-# s3 and database
-s3 = boto3.client("s3", 
-    region_name=os.getenv("REGION_NAME"),
-    aws_access_key_id=os.getenv("S3_KEY"),
-    aws_secret_access_key=os.environ.get("S3_SECRET_KEY"))
-BUCKET_NAME = os.getenv("S3_BUCKET")
-
-db_host=os.getenv("RDS_HOST")
-db_user=os.getenv("RDS_USER")
-db_password=os.getenv("RDS_PASSWORD")
-db_database=os.getenv("RDS_DB")
-
-###
+# functions
+start_time = datetime.now()
 
 def get_all_links():
     all_job_links = []
@@ -331,50 +315,25 @@ def upload_to_s3(filename):
         return result
     except Exception as e:
         return {"errors": str(e)}
-    
-def crawler_518():
-    try:
-        all_links = get_all_links()
-        logger.info(f'total job_links: {len(all_links)}')
 
-        all_jd = get_all_jd(all_links)
-        logger.info(f'total jds: {len(all_jd)}')
 
-        insert_sql(all_jd)
-        logger.info("inserted all 518 jd to db")
+all_links = get_all_links()
+logger.info(f'total job_links: {len(all_links)}')
 
-        all_jd_json = list_to_json(all_jd)
-        logger.info("transformed all jd to json")
+all_jd = get_all_jd(all_links)
+logger.info(f'total jds: {len(all_jd)}')
 
-        upload_to_s3(all_jd_json)
-        logger.info("uploaded today's 518 json")
+insert_sql(all_jd)
+logger.info("inserted all 518 jd to db")
 
-        logger.info("Done")
-    except Exception as e:
-        logger.error(f"crawler bug: {e}")
+all_jd_json = list_to_json(all_jd)
+logger.info("transformed all jd to json")
 
-default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5)
-}
+upload_to_s3(all_jd_json)
+logger.info("uploaded today's 518 json")
 
-with DAG(
-    dag_id='crawler_518',
-    schedule="0 17 * * *",  # Run the DAG daily at 17:00 UTC
-    start_date=datetime.today(),
-    default_args=default_args,
-    catchup=False,
-    tags=['crawler', '518', 'daily']
-) as dag:
-    t1 = PythonOperator(
-        task_id='518_crawler',
-        python_callable=crawler_518,
-        dag=dag
-    )
+logger.info("Done")
 
-    (t1)
+end_time = datetime.now()
+logger.info(f"start and end time: {start_time}, {end_time}")
 

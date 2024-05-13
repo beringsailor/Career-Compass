@@ -49,7 +49,7 @@ img {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     width: 100%;
 }
 
@@ -71,15 +71,6 @@ img {
     width: fit-content;
 }
 
-/* #region-chart, 
-#edu-chart,
-#category-chart,
-#ratio-chart {
-    flex: 1;
-    margin: 10px;
-    border: 2px solid gray;
-} */
-
 .chart {
     flex: 1;
     margin: 10px;
@@ -89,29 +80,30 @@ img {
 }
 
 .chart img {
-    width: 100%; /* Make the content fill its container */
-    height: 100%; /* Make the content fill its container */
-    object-fit: contain; /* Ensure the content is visible within the container */
-    position: absolute; /* Position the content within its container */
-    top: 0; /* Align the content to the top */
-    left: 0; /* Align the content to the left */
+    width: 100%;
+    height: 100%;
+    object-fit: contain; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
 }
 
 .chart {
-    flex-grow: 1; /* Allow items to grow and shrink within the flex container */
+    flex-grow: 1;
     margin: 10px;
     border: 2px solid gray;
-    overflow: hidden; /* Hide any content that overflows the container */
-    position: relative; /* Ensure proper positioning of the content */
+    overflow: hidden;
+    position: relative;
 }
 
 .chart img {
-    width: 100%; /* Make the content fill its container */
-    height: 100%; /* Make the content fill its container */
-    object-fit: contain; /* Ensure the content is visible within the container */
-    position: absolute; /* Position the content within its container */
-    top: 0; /* Align the content to the top */
-    left: 0; /* Align the content to the left */
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
+
 
 

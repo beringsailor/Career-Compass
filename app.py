@@ -84,8 +84,15 @@ def homepage(user_id=None):
         name=None
         bookmarked_list=None
         
-    query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
-                FROM job WHERE 1=1 ORDER BY RAND() LIMIT 5;"
+    query = """
+        SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
+        FROM job 
+        WHERE 1=1 
+        AND NOT (salary_period LIKE '年薪%%' OR salary_period LIKE '時薪%%')
+        AND salary_period NOT LIKE '%%待遇面議%%'
+        ORDER BY RAND() 
+        LIMIT 5;
+    """
     cursor.execute(query)
     recommends = cursor.fetchall()
     conn.close()
@@ -117,7 +124,14 @@ def search_jobs_get(user_id=None):
             name = None
             bookmarked_list = None
         
-        query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code FROM job WHERE 1=1"
+        query = """
+            SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
+            FROM job 
+            WHERE 1=1
+            AND NOT (salary_period LIKE '%%年薪%%' 
+                    OR salary_period LIKE '%%時薪%%'
+                    OR salary_period LIKE '%%待遇面議%%')
+        """
         params = []
 
         if job_title:
@@ -221,20 +235,28 @@ def get_jd(user_id, job_code):
 
         conn.close()
 
-    return render_template('job_content.html', results=results, \
+    return render_template('job_content.html', results=results, user_id=user_id, \
                            sides=sides, name=name, bookmarked_list=bookmarked_list)
 
 @server.route('/user/login', methods=['GET'])
 def get_login_page():
-    return render_template('login.html')
+    message = session.pop('message', None)
+    return render_template('login.html', message=message)
 
 @server.route('/api/user/signup', methods=['POST']) 
 def signup():
     if request.method == 'POST':
         email = request.form['email']
-        if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+        if not re.match(r'^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$', email):
             message_signup = "Invalid email format"
             return render_template('login.html', message_signup=message_signup)
+        
+        # Check password format
+        password = request.form['password']
+        if not re.match(r'[A-Za-z0-9@#$%^&+=]{8,}', password):
+            message_signup = "Password must be at least 8 characters long and contain only letters, digits, or special characters: @#$%^&+="
+            return render_template('login.html', message_signup=message_signup)
+
         conn = connect_db()
         if conn:
             cursor = conn.cursor()
@@ -330,16 +352,20 @@ def profile(user_id):
             account = cursor.fetchall()
             data = account
             name = account[0]['name']
-            # return jsonify({"data":data})
             return render_template('profile.html', data=data, name=name)
         except Exception as e:
             logging.error("user profile api error")
+    else:
+        session['message'] = "Please login first."
+        return redirect(url_for('get_login_page')) 
 
 @server.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard(user_id=None):
     conn = connect_db()
     cursor = conn.cursor()
+
+    name = None
     # Example of different content based on login status
     if user_id:
         query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
@@ -353,10 +379,6 @@ def dashboard(user_id=None):
 
         conn.close()
     return render_template('dashboard.html', name=name)
-
-@server.route('/dashapp/')
-def render_dashboard():
-    return flask.redirect('/dash')
 
 @server.route('/api/dashboard/job_vacancy', methods=['POST'])
 def get_vacancy_ratio():
@@ -438,7 +460,7 @@ def get_categories():
                     AND (min_salary != 0 OR max_salary != 0) 
                     AND max_salary != 9999999 
                     AND salary_period != '待遇面議' 
-                    AND NOT (salary_period LIKE '年薪%%' OR salary_period LIKE '時薪%%')
+                    AND NOT (salary_period LIKE '%%年薪%%' OR salary_period LIKE '%%時薪%%')
                     AND LEFT(job_location, 3) IN (
                         '連江縣','台北市','新北市','桃園市','台中市',
                         '台南市', '高雄市','宜蘭縣','新竹縣','苗栗縣',
@@ -643,6 +665,10 @@ def display_wordcloud():
         return send_file(img, mimetype='image/png')
     except Exception as e:
         logging.warning("An error occurred:", e) 
+
+@server.errorhandler(404)
+def page_not_found(error):
+    return render_template('404.html'), 404
 
 if __name__ == '__main__':
     server.run(debug=True, host='127.0.0.1', port=5000)
