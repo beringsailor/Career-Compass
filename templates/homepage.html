@@ -46,6 +46,11 @@
             <div class="container-second">
                 <div class="searchbar">
                     <form class="item_ul" action="/job/search" method="GET">
+                        {% if keyword %}
+                            <input class="item" type="text" name="keyword" placeholder="Keyword" value="{{ keyword }}">
+                        {% else %}
+                            <input class="item" type="text" name="keyword" placeholder="Keyword" value="">
+                        {% endif %}
                         {% if job_title %}
                             <input class="item" type="text" name="job_title" placeholder="Job Title" value="{{ job_title }}">
                         {% else %}
@@ -66,7 +71,7 @@
                 </div>
             </div>
         </div>        
-        <div class="container d-flex justify-content-center mt-50 mb-50">   
+        <div class="container d-flex justify-content-center mt-50 mb-50">
             <div class="row">
                 <div class="col-md-10" style="width: 400px;">
                     {% if recommends %}
@@ -241,6 +246,15 @@
         
                     window.location.href = newUrl;
                 }
+            });
+
+            // for dropdown
+            $(document).ready(function(){
+                $('.dropdown-submenu a.test').on("click", function(e){
+                    $(this).next('ul').toggle();
+                    e.stopPropagation();
+                    e.preventDefault();
+                });
             });
         </script>
     </body>

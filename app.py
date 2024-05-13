@@ -103,6 +103,7 @@ def homepage(user_id=None):
 @login_required
 def search_jobs_get(user_id=None):
     try:
+        keyword = request.args.get('keyword')
         job_title = request.args.get('job_title')
         salary = request.args.get('salary')
         location = request.args.get('location')
@@ -134,6 +135,13 @@ def search_jobs_get(user_id=None):
         """
         params = []
 
+        if keyword:
+            query += """ AND job_title LIKE %s
+                        OR company_name LIKE %s
+                        OR job_location LIKE %s
+                        OR skills LIKE %s
+            """
+            params.extend(['%' + keyword + '%'] * 4)
         if job_title:
             query += " AND job_title LIKE %s"
             params.append('%' + job_title + '%')
@@ -157,14 +165,14 @@ def search_jobs_get(user_id=None):
 
         if results == None:
             word = "no more jobs"
-            return render_template('homepage.html', name=name, page=page, \
+            return render_template('homepage.html', name=name, page=page, keyword=keyword, \
                                     job_title=job_title, salary=salary, location=location, \
                                     bookmarked_list=bookmarked_list, user_id=user_id)
 
         conn.close()
         
         # Render template with search results
-        return render_template('homepage.html', name=name, results=results, page=page, \
+        return render_template('homepage.html', name=name, results=results, page=page, keyword=keyword, \
                                     job_title=job_title, salary=salary, location=location, \
                                     bookmarked_list=bookmarked_list, user_id=user_id)
     except Exception as e:
