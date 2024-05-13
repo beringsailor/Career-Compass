@@ -29,3 +29,14 @@ jobs:
     - name: run test
       run: |
         python app.py
+      env:
+          RDS_HOST: ${{ secrets.CC_RDS_DB }}
+          RDS_USER: ${{ secrets.CC_RDS_USER }}
+          RDS_PASSWORD: ${{ secrets.CC_RDS_PASSWORD }}
+          RDS_DB: ${{ secrets.CC_RDS_DB }}
+          SECRET_KEY: ${{ secrets.CC_SECRET_KEY }}
+          SECRET: ${{ secrets.CC_SECRET }}
+          ALGORITHM: ${{ secrets.CC_ALGORITHM }}
+          
+          
+          
