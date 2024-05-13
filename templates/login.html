@@ -12,6 +12,9 @@
 </head>
 <body> 
     {% include 'nav_bar.html' %}
+    {% if message %}
+        <script>alert("{{ message }}");</script>
+    {% endif %}
     
     <div class="template">
         <div class="container" id="container">

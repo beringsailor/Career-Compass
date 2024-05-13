@@ -13,6 +13,7 @@
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap">
         <script>
             function toggleBookmark(userId, jobCode) {
+                event.preventDefault();
                 var bookmarkIcon = document.getElementById('bookmarkIcon-' + jobCode);
                 // Send AJAX request to Flask API
                 fetch('/bookmark/' + userId + '/' + jobCode)
@@ -67,15 +68,16 @@
         </div>        
         <div class="container d-flex justify-content-center mt-50 mb-50">   
             <div class="row">
-                <div class="col-md-10" style="max-width: 800px;">
+                <div class="col-md-10" style="width: 400px;">
                     {% if recommends %}
+                    <br>
                     <h2>推薦職缺</h2>
                         {% for job in recommends %}
                         <div class="card card-body mt-3">
                             <div class="media align-items-center align-items-lg-start text-center text-lg-left flex-column flex-lg-row">
-                                <div class="job mr-2 mb-3 mb-lg-0">
+                                <!-- <div class="job mr-2 mb-3 mb-lg-0">
                                         <img src="https://cdn-icons-png.flaticon.com/512/4812/4812244.png" width="150" height="150" alt="">
-                                </div>
+                                </div> -->
 
                                 <div class="media-body">
                                     <h4 class="media-title font-weight-semibold">
@@ -127,8 +129,9 @@
                         <br>
                     {% endif %}
                 </div>
-                <div class="col-md-10" style="max-width: 800px;">
+                <div class="col-md-10" style="width: 400px;">
                     {% if results %}
+                    <br>
                     <h2>查詢結果</h2>
                         {% for job in results %}
                         <div class="card card-body mt-3">
@@ -185,13 +188,25 @@
                         {% endfor %}
                         <br>
                         <br>
-                    <div class="col-md-10">
-                        <div class="page-bottom-nav">
+                    <div class="container-no-match">
+                        <div class="page-bottom-nav flex-container-1">
                             <button id="previousPage">上一頁</button>
                             <span class="current-page">第{{ page }}頁</span>
                             <button id="nextPage">下一頁</button>
                         </div>
-                    </div>   
+                    </div>
+                    {% else %}
+                        {% if recommends %}
+                        <div></div>
+                        {% else %}
+                        <div class="container-no-match">
+                            <div class="flex-container-no-match">
+                                <h3>No matching search results</h3>
+                                <h6>There are no matches for your search.</h6>
+                                <h6>Try to re-search to avoid errors.</h6>
+                            </div>
+                        </div>
+                        {% endif %}
                     {% endif %}
                 </div>        
             </div>

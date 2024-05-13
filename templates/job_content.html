@@ -14,6 +14,7 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='page_item.css') }}">
         <script>
          function toggleBookmark(userId, jobCode) {
+            event.preventDefault();
             var bookmarkIcon = document.getElementById('bookmarkIcon-' + jobCode);
             // Send AJAX request to Flask API
             fetch('/bookmark/' + userId + '/' + jobCode)
@@ -80,7 +81,7 @@
                            </div>
                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">公司：{{ result.company_name }}</a> <span class="rated"></span> </div>
                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">地址：{{ result.job_location }}</a> <span class="rated"></span> </div>
-                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">薪資：{{ result.salary_period }}</a> <span class="rated">==</span> </div>
+                           <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">薪資：{{ result.salary_period }}</a> <span class="rated"></span> </div>
                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">學歷：{{ result.edu_level }}</a> <span class="rated"></span> </div>
                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">年資：{{ result.work_experience }}</a> <span class="rated"></span> </div>
                            <div class="col-md-9 col-xs-9"> <a href="#" class="title" data-abc="true">技能：{{ result.skills }}</a> <span class="rated"></span> </div>

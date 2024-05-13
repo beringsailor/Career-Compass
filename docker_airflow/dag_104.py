@@ -391,7 +391,7 @@ default_args = {
 
 with DAG(
     dag_id='crawler_104',
-    schedule="0 5 * * *",  # Run the DAG daily at 05:00 UTC
+    schedule="0 17 * * *",  # Run the DAG daily at 17:00 UTC
     start_date=datetime.today(),
     default_args=default_args,
     catchup=False,

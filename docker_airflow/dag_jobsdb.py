@@ -57,7 +57,7 @@ def get_all_codes():
     while True:
         try:
             # url = f"https://hk.jobsdb.com/jobs-in-government-defence?page={page_num}"
-            url = f"https://hk.jobsdb.com/jobs-in-information-communication-technology??daterange=14&page={page_num}"
+            url = f"https://hk.jobsdb.com/jobs-in-information-communication-technology?daterange=14&page={page_num}"
             response = requests.get(url)
             if response.status_code != requests.codes.ok:
                 logger.error(f'job_code page request failed')
@@ -444,7 +444,7 @@ default_args = {
 
 with DAG(
     dag_id='crawler_jobsdb',
-    schedule="0 5 * * *",  # Run the DAG daily at 05:00 UTC
+    schedule="0 17 * * *",  # Run the DAG daily at 17:00 UTC
     start_date=datetime.today(),
     default_args=default_args,
     catchup=False,
