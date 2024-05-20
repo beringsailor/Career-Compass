@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# for line 341
+# -*- coding: utf-8 -*- for line 341
 
 import flask
 import os
@@ -10,6 +9,7 @@ import pymysql
 from datetime import datetime, timedelta, timezone
 import matplotlib.pyplot as plt
 from io import BytesIO
+from DBUtils.PooledDB import PooledDB
 from hashlib import sha256
 from dotenv import load_dotenv
 from functools import wraps
@@ -28,17 +28,25 @@ SECRET = os.getenv("SECRET")
 ALGORITHM = os.getenv("ALGORITHM")
 
 # Connect to AWS RDS
+pool = PooledDB(
+    creator=pymysql, 
+    maxconnections=10,
+    mincached=2,
+    maxcached=5,
+    blocking=True,
+    host=os.getenv("RDS_HOST"),
+    user=os.getenv("RDS_USER"),
+    password=os.getenv("RDS_PASSWORD"),
+    database=os.getenv("RDS_DB"),
+    charset='utf8mb4',
+    cursorclass=pymysql.cursors.DictCursor
+)
+
 def connect_db():
-    db_conn = pymysql.connect(host=os.getenv("RDS_HOST"),
-                            user=os.getenv("RDS_USER"),
-                            password=os.getenv("RDS_PASSWORD"),
-                            database=os.getenv("RDS_DB"),
-                            charset='utf8mb4',
-                            cursorclass=pymysql.cursors.DictCursor)
-    return db_conn
+    # Get a connection from the pool
+    return pool.connection() 
 
 conn = connect_db()
-cursor = conn.cursor()
 
 # get jwt token info
 SECRET = os.getenv("SECRET")
@@ -64,26 +72,30 @@ def login_required(view_func):
 
     return decorated_function
 
+def get_user_info(user_id, cursor):
+    if user_id:
+        cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
+        account = cursor.fetchall()
+        name = account[0]['name'] if account else None
+
+        cursor.execute('SELECT * FROM user_bookmark WHERE user_id = %s', (user_id,))
+        bookmarked = cursor.fetchall()
+        bookmark_list = [b['job_code'] for b in bookmarked]
+    else:
+        name = None
+        bookmark_list = None
+
+    return {'name': name, 'bookmark_list': bookmark_list}
+
 @server.route('/', methods=['GET','POST'])
 @login_required
 def homepage(user_id=None):
-    conn = connect_db()
     cursor = conn.cursor()
-    # Example of different content based on login status
-    if user_id:
-        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
-        account = cursor.fetchall()
-        name = account[0]['name']
+    
+    user_info = get_user_info(user_id, cursor)
+    name = user_info['name']
+    bookmarked_list = user_info['bookmark_list']
 
-        bookmarked = cursor.execute('SELECT * FROM user_bookmark WHERE user_id = %s', (user_id,))
-        bookmarked = cursor.fetchall()
-        bookmarked_list = []
-        for b in bookmarked:
-            bookmarked_list.append(b['job_code'])
-    else:
-        name=None
-        bookmarked_list=None
-        
     query = """
         SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
         FROM job 
@@ -95,7 +107,6 @@ def homepage(user_id=None):
     """
     cursor.execute(query)
     recommends = cursor.fetchall()
-    conn.close()
 
     return render_template('homepage.html', recommends=recommends, name=name, user_id=user_id)
 
@@ -109,21 +120,11 @@ def search_jobs_get(user_id=None):
         location = request.args.get('location')
         page = request.args.get('page', default=1, type=int)
 
-        conn = connect_db()
         cursor = conn.cursor()
-        if user_id:
-            account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
-            account = cursor.fetchall()
-            name = account[0]['name']
-
-            bookmarked = cursor.execute('SELECT * FROM user_bookmark WHERE user_id = %s', (user_id,))
-            bookmarked = cursor.fetchall()
-            bookmarked_list = []
-            for b in bookmarked:
-                bookmarked_list.append(b['job_code'])
-        else:
-            name = None
-            bookmarked_list = None
+        
+        user_info = get_user_info(user_id, cursor)
+        name = user_info['name']
+        bookmarked_list = user_info['bookmark_list']
         
         query = """
             SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
@@ -164,14 +165,10 @@ def search_jobs_get(user_id=None):
         results = cursor.fetchall()
 
         if results == None:
-            word = "no more jobs"
             return render_template('homepage.html', name=name, page=page, keyword=keyword, \
                                     job_title=job_title, salary=salary, location=location, \
                                     bookmarked_list=bookmarked_list, user_id=user_id)
 
-        conn.close()
-        
-        # Render template with search results
         return render_template('homepage.html', name=name, results=results, page=page, keyword=keyword, \
                                     job_title=job_title, salary=salary, location=location, \
                                     bookmarked_list=bookmarked_list, user_id=user_id)
@@ -181,7 +178,6 @@ def search_jobs_get(user_id=None):
 @server.route('/bookmark/<user_id>/<job_code>', methods=['GET'])
 @login_required
 def check_bookmark(uid_decorator, user_id, job_code):
-    conn = connect_db()
     cursor = conn.cursor()
     if user_id:
         # Check if the post is already in the favorite list
@@ -198,8 +194,6 @@ def check_bookmark(uid_decorator, user_id, job_code):
             action = 'add'
         
         conn.commit()
-        cursor.close()
-        conn.close()
         
         return jsonify({'action': action})
 
@@ -207,26 +201,18 @@ def check_bookmark(uid_decorator, user_id, job_code):
 @server.route('/job/<job_code>', methods=['GET'])
 @login_required
 def get_jd(user_id, job_code):
-    conn = connect_db()
-    cursor = conn.cursor()
+    cursor = conn.cursor()  
     
-    if user_id:
-        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
-        account = cursor.fetchall()
-        name = account[0]['name']
-
-        bookmarked = cursor.execute('SELECT * FROM user_bookmark WHERE user_id = %s', (user_id,))
-        bookmarked = cursor.fetchall()
-        bookmarked_list = []
-        for b in bookmarked:
-            bookmarked_list.append(b['job_code'])
-    else:
-        name = None
-        bookmarked_list = None
+    user_info = get_user_info(user_id, cursor)
+    name = user_info['name']
+    bookmarked_list = user_info['bookmark_list']
     
     if job_code:
         results = cursor.execute("SELECT * FROM job WHERE job_code=%s", (job_code,))
         results = cursor.fetchall()
+
+        if not results:
+            return render_template('404.html'), 404
 
         cursor.execute("""
             SELECT DISTINCT job.job_code AS job_code, job_title, company_name, job_location
@@ -241,10 +227,8 @@ def get_jd(user_id, job_code):
             """, (job_code, job_code,))
         sides = cursor.fetchall()
 
-        conn.close()
-
     return render_template('job_content.html', results=results, user_id=user_id, \
-                           sides=sides, name=name, bookmarked_list=bookmarked_list)
+                        sides=sides, name=name, bookmarked_list=bookmarked_list)
 
 @server.route('/user/login', methods=['GET'])
 def get_login_page():
@@ -265,7 +249,6 @@ def signup():
             message_signup = "Password must be at least 8 characters long and contain only letters, digits, or special characters: @#$%^&+="
             return render_template('login.html', message_signup=message_signup)
 
-        conn = connect_db()
         if conn:
             cursor = conn.cursor()
             try:
@@ -302,52 +285,43 @@ def signup():
             except Exception as e:
                 logging.error("signup error")
 
-        cursor.close()
-        conn.close()
-
 @server.route('/api/user/signin', methods=['POST']) 
 def signin():
     if request.method == 'POST':
-        conn = connect_db()
-        if conn:
-            cursor = conn.cursor()
-            try:
-                email = request.form['email']
-                password = request.form['password']
-                hashed_pw = sha256(password.encode('utf-8')).hexdigest()
-                values = (email, hashed_pw)
+        cursor = conn.cursor()
+        try:
+            email = request.form['email']
+            password = request.form['password']
+            hashed_pw = sha256(password.encode('utf-8')).hexdigest()
+            values = (email, hashed_pw)
 
-                account = cursor.execute('SELECT id, name, email \
-                                    FROM user WHERE email=%s AND password=%s', values)
-                account = cursor.fetchall()
-                if not account:
-                    flash('Invalid email or password for signing in', 'signin_error')
-                    message_signin = "Wrong email or password"
-                    return render_template('login.html', message_signin=message_signin)
-                
-                payload = {
-                    'user_id':account[0]['id'],
-                    'exp' : datetime.now(timezone.utc) + timedelta(seconds=3600)
-                    }
-                token = jwt.encode(payload, SECRET, ALGORITHM)
+            account = cursor.execute('SELECT id, name, email \
+                                FROM user WHERE email=%s AND password=%s', values)
+            account = cursor.fetchall()
+            if not account:
+                flash('Invalid email or password for signing in', 'signin_error')
+                message_signin = "Wrong email or password"
+                return render_template('login.html', message_signin=message_signin)
+            
+            payload = {
+                'user_id':account[0]['id'],
+                'exp' : datetime.now(timezone.utc) + timedelta(seconds=3600)
+                }
+            token = jwt.encode(payload, SECRET, ALGORITHM)
 
-                resp = make_response(redirect(url_for('homepage')))
+            resp = make_response(redirect(url_for('homepage')))
 
-                token_bearer = 'Bearer' + ' ' + str(token)
-                resp.set_cookie('access_token', token_bearer)
-                return resp
-            except Exception as e:
-                logging.error("signin error")
-            finally:
-                cursor.close()
-                conn.close()
+            token_bearer = 'Bearer' + ' ' + str(token)
+            resp.set_cookie('access_token', token_bearer)
+            return resp
+        except Exception as e:
+            logging.error("signin error")
 
 @server.route('/user/profile', methods=['GET']) 
 @login_required
 def profile(user_id):
     if user_id:
         try:
-            conn = connect_db()
             cursor = conn.cursor()
             account = cursor.execute("""
                     SELECT job.job_code as job_code, user.id AS user_id, name , email, job_source,
@@ -370,22 +344,10 @@ def profile(user_id):
 @server.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard(user_id=None):
-    conn = connect_db()
     cursor = conn.cursor()
+    user_info = get_user_info(user_id, cursor)
+    name = user_info['name']
 
-    name = None
-    # Example of different content based on login status
-    if user_id:
-        query = "SELECT job_title, company_name, job_location, salary_period, job_source, job_code \
-                    FROM job WHERE 1=1 ORDER BY RAND() LIMIT 10;"
-        cursor.execute(query)
-        recommends = cursor.fetchall()
-
-        account = cursor.execute('SELECT name FROM user WHERE id=%s', user_id)
-        account = cursor.fetchall()
-        name = account[0]['name']
-
-        conn.close()
     return render_template('dashboard.html', name=name)
 
 @server.route('/api/dashboard/job_vacancy', methods=['POST'])
@@ -394,7 +356,6 @@ def get_vacancy_ratio():
         keyword = request.json.get('input_text') if request.json else None
 
     try:
-        conn = connect_db()
         cursor = conn.cursor()
 
         if keyword:
@@ -432,7 +393,6 @@ def get_vacancy_ratio():
             )
 
         job_posts = cursor.fetchall()
-        conn.close()
 
         others = []
         chose_cat = []
@@ -452,7 +412,6 @@ def get_vacancy_ratio():
 @server.route('/api/dashboard/job_salary')
 def get_categories():
     try:
-        conn = connect_db()
         cursor = conn.cursor()
 
         category_avgs = cursor.execute(
@@ -482,7 +441,6 @@ def get_categories():
             )
         
         category_avgs = cursor.fetchall()
-        conn.close()
 
         category = []
         category_avg = []
@@ -554,7 +512,6 @@ def display_region_salary():
             )
 
         salary_avgs = cursor.fetchall()
-        conn.close()
 
         region = []
         region_avg = []
@@ -603,7 +560,6 @@ def display_edu_level():
             )
 
         edu_types = cursor.fetchall()
-        conn.close()
 
         edu_name = []
         edu_name_num = []
@@ -653,8 +609,6 @@ def display_wordcloud():
             )
         
         skills = cursor.fetchall()
-        conn.close() 
-
         skill_list = []
         for skill in skills:
             skill_list.append(skill['skills'])

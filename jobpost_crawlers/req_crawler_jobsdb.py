@@ -42,12 +42,12 @@ def get_all_codes():
 
     while True:
         try:
-            url = f"https://hk.jobsdb.com/jobs-in-government-defence?page={page_num}"
-            # url = f"https://hk.jobsdb.com/jobs-in-information-communicat ion-technology?page={page_num}"
+            # url = f"https://hk.jobsdb.com/jobs-in-government-defence?page={page_num}"
+            url = f"https://hk.jobsdb.com/jobs-in-information-communication-technology?daterange=14&page={page_num}"
             response = requests.get(url)
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            job_articles = soup.find_all('article', class_='y735df0 y735df1 _1iz8dgs7i _1iz8dgs6e _1iz8dgs9q _1iz8dgs8m _1iz8dgsh _1iz8dgs66 _1iz8dgs5e _12jtennf _12jtennd _12jtenne _94v4w18 _94v4w1b _1iz8dgs32 _1iz8dgs35')
+            job_articles = soup.find_all('article', class_='y735df0 y735df1 _1iz8dgs7i _1iz8dgs6e _1iz8dgs9q _1iz8dgs8m _1iz8dgsh _1iz8dgs66 _1iz8dgs5e _12jtennb _12jtenn9 _12jtenna _94v4w18 _94v4w1b _1iz8dgs32 _1iz8dgs35')
 
             if job_articles:
                 for job_article in job_articles:
@@ -62,6 +62,7 @@ def get_all_codes():
                             if matches:
                                 # Extract the first match
                                 job_code = matches[0]
+                                print(job_code)
                                 # print(job_code)
                                 all_job_codes.append(job_code)
                                 # time.sleep(1)

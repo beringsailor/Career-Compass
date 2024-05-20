@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler = logging.FileHandler('crawler_104_dag.log')
+file_handler = logging.FileHandler('crawler_104.log')
 file_handler.setFormatter(formatter)
 
 logger.addHandler(file_handler)
