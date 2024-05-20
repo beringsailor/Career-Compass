@@ -111,5 +111,40 @@ class TestSignup(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Password must be at least 8 characters long', response.data)
 
+class TestSearchJobsGet(unittest.TestCase):
+
+    def setUp(self):
+        server.testing = True
+        self.app = server.test_client()
+
+    @patch('app.get_user_info')
+    @patch('app.conn.cursor')
+    def test_search_jobs_valid(self, mock_cursor, mock_get_user_info):
+        mock_get_user_info.return_value = {'name': 'John Doe', 'bookmark_list': ['job1', 'job2']}
+        mock_cursor.return_value.fetchall.return_value = [
+            {'job_title': 'Software Engineer', 'company_name': 'Company A', 'job_location': 'Location A', 'salary_period': 'monthly', 'job_source': 'source', 'job_code': 'job1'},
+            {'job_title': 'Data Scientist', 'company_name': 'Company B', 'job_location': 'Location B', 'salary_period': 'monthly', 'job_source': 'source', 'job_code': 'job2'}
+        ]
+
+        response = self.app.get('/job/search?keyword=Engineer&job_title=Software&salary=50000&location=A&user_id=1')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.data.decode('utf-8')
+        self.assertIn('Software Engineer', data)
+        self.assertIn('Company A', data)
+        self.assertIn('John Doe', data)
+
+    @patch('app.get_user_info')
+    @patch('app.conn.cursor')
+    def test_search_jobs_invalid(self, mock_cursor, mock_get_user_info):
+        mock_get_user_info.return_value = {'name': 'John Doe', 'bookmark_list': ['job1', 'job2']}
+        mock_cursor.return_value.fetchall.return_value = []
+
+        response = self.app.get('/job/search?keyword=NonExistentJob&job_title=NonExistent&salary=50000&location=Nowhere')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.data.decode('utf-8')
+        self.assertIn('No matching search results', data)
+
 if __name__ == '__main__':
     unittest.main()
