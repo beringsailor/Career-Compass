@@ -33,7 +33,7 @@ Account to add job postings into favorites, here is a test account:
 
 ### Database Schema
 
-![System Architecture](readme_materials/db_schema.png)
+(readme_materials/db_schema.png)
 
 
 
