@@ -49,13 +49,16 @@ System Architecture
 ## Feature Demo
 
 ### Search
-- [search](readme_materials/function_search.gif)
+
+![search](readme_materials/function_search.gif)
 
 ### Bookmark
-- [bookmark](readme_materials/function_bookmark.gif)
+
+![bookmark](readme_materials/function_bookmark.gif)
 
 ### Dashboard
-- [dashboard](readme_materials/function_dashboard.gif)
+
+![dashboard](readme_materials/function_dashboard.gif)
 
 ## Contact
 
