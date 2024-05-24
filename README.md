@@ -50,13 +50,22 @@ System Architecture
 
 ### Search
 
+Users can use keywords, title, desired monthly salary, and location.
 ![search](readme_materials/function_search.gif)
 
 ### Bookmark
 
+Users can bookmark job postings for later review.
 ![bookmark](readme_materials/function_bookmark.gif)
 
 ### Dashboard
+
+The dashboard provids an overview on the job market based on different software engineer domains.
+Topics include:
+- Regional verage salary based on available job postings.
+- Required minimum education level.
+- Percentage of the domain in the whole software engineer field.
+- Keywords for skills required in the domain.
 
 ![dashboard](readme_materials/function_dashboard.gif)
 
