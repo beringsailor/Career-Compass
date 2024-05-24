@@ -17,7 +17,17 @@ from wordcloud import WordCloud
 from flask import session, request, render_template, send_file, jsonify, make_response, flash, redirect, url_for
 # from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
-load_dotenv()
+load_dotenv()  
+
+# logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler('app.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+logger.info('Start app.py')
 
 server = flask.Flask(__name__)
 server.secret_key = os.getenv("SECRET_KEY")

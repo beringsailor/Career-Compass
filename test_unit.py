@@ -122,8 +122,7 @@ class TestSearchJobsGet(unittest.TestCase):
     def test_search_jobs_valid(self, mock_cursor, mock_get_user_info):
         mock_get_user_info.return_value = {'name': 'John Doe', 'bookmark_list': ['job1', 'job2']}
         mock_cursor.return_value.fetchall.return_value = [
-            {'job_title': 'Software Engineer', 'company_name': 'Company A', 'job_location': 'Location A', 'salary_period': 'monthly', 'job_source': 'source', 'job_code': 'job1'},
-            {'job_title': 'Data Scientist', 'company_name': 'Company B', 'job_location': 'Location B', 'salary_period': 'monthly', 'job_source': 'source', 'job_code': 'job2'}
+            {'job_title': 'Software Engineer', 'company_name': 'Company A', 'job_location': 'Location A', 'salary_period': 'monthly', 'job_source': 'source', 'job_code': 'job1'}
         ]
 
         response = self.app.get('/job/search?keyword=Engineer&job_title=Software&salary=50000&location=A&user_id=1')

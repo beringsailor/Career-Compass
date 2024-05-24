@@ -204,13 +204,14 @@ def process_all_jd(all_jd):
     total_count = len(all_jd)
     all_processed_jds = []
     for index, jd in enumerate(all_jd):
-        logger.info(f"Now gemini processing JD {index + 1} of {total_count}")
-        try:
-            jd = get_gemini_summary(jd)
-            all_processed_jds.append(jd)
-            time.sleep(0.1)
-        except Exception as e:
-            logger.error(f"Failed to get JD {index + 1} of {total_count}: {e}")
+        if index < 2000:
+            logger.info(f"Now gemini processing JD {index + 1} of {total_count}")
+            try:
+                jd = get_gemini_summary(jd)
+                all_processed_jds.append(jd)
+                time.sleep(0.1)
+            except Exception as e:
+                logger.error(f"Failed to get JD {index + 1} of {total_count}: {e}")
     return all_processed_jds
 
 def raw_jd_to_json(input_list):

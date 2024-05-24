@@ -1,5 +1,6 @@
 # ignore
 __pycache__/
+.pytest_cache/
 Logs/
 *.env
 *.vscode

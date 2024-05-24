@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 8.0.36, for Win64 (x86_64)
 --
--- Host: careercompass.cpigyg0wwaz2.ap-northeast-1.rds.amazonaws.com    Database: pp_aws
+-- Host: careercompass-1a.cpigyg0wwaz2.ap-northeast-1.rds.amazonaws.com    Database: pp_aws
 -- ------------------------------------------------------
 -- Server version	8.0.35
 
@@ -40,7 +40,7 @@ CREATE TABLE `job` (
   `min_salary` bigint DEFAULT NULL,
   `max_salary` bigint DEFAULT NULL,
   `edu_level` varchar(255) DEFAULT NULL,
-  `work_experience` varchar(255) NOT NULL,
+  `work_experience` varchar(255) DEFAULT NULL,
   `skills` varchar(255) DEFAULT NULL,
   `travel` varchar(255) DEFAULT NULL,
   `management` varchar(255) DEFAULT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE `job` (
   `create_date` timestamp NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `job_job_code_unique` (`job_code`)
-) ENGINE=InnoDB AUTO_INCREMENT=23043 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=103793 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -65,8 +65,9 @@ CREATE TABLE `job_category` (
   `job_category` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_job_code` (`job_code`),
-  CONSTRAINT `job_category_job_code_foreign` FOREIGN KEY (`job_code`) REFERENCES `job` (`job_code`)
-) ENGINE=InnoDB AUTO_INCREMENT=56890 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `job_code_category_idx` (`job_code`,`job_category`),
+  CONSTRAINT `job_category_job_code_foreign` FOREIGN KEY (`job_code`) REFERENCES `job` (`job_code`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=1266583 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -92,7 +93,43 @@ CREATE TABLE `job_post_change` (
   `date` date NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_date` (`date`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `user`
+--
+
+DROP TABLE IF EXISTS `user`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_email_unique` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `user_bookmark`
+--
+
+DROP TABLE IF EXISTS `user_bookmark`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_bookmark` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `job_code` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `user_bookmark_user_id_foreign` (`user_id`),
+  KEY `user_bookmark_job_code_foreign` (`job_code`),
+  CONSTRAINT `user_bookmark_job_code_foreign` FOREIGN KEY (`job_code`) REFERENCES `job` (`job_code`) ON DELETE CASCADE,
+  CONSTRAINT `user_bookmark_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=166 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -105,4 +142,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-04-22 17:06:24
+-- Dump completed on 2024-05-23 13:28:42
