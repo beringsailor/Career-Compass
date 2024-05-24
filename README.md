@@ -20,9 +20,9 @@ Account to add job postings into favorites, here is a test account:
 
 ## Technologies Used
 
-Programming Languages: Python, Javascript, HTML, CSS
-Cloud Services: AWS EC2, RDS, S3, CloudWatch
-Tools: Docker, Airflow, Nginx, Gunicorn, Plotly
+- Programming Languages: Python, Javascript, HTML, CSS
+- Cloud Services: AWS EC2, RDS, S3, CloudWatch
+- Tools: Docker, Airflow, Nginx, Gunicorn, Plotly
 
 ## Architecture
 
