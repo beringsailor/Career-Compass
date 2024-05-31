@@ -508,7 +508,7 @@ def display_region_salary():
                 WHERE (min_salary != 0 OR max_salary != 0) 
                     AND max_salary != 9999999 
                     AND salary_period != '待遇面議' 
-                    AND NOT (salary_period LIKE '年薪%%' OR salary_period LIKE '時薪%%')
+                    AND NOT (salary_period LIKE '%%年薪%%' OR salary_period LIKE '%%時薪%%')
                     AND LEFT(job_location, 3) IN (
                         '連江縣','台北市','新北市','桃園市','台中市',
                         '台南市', '高雄市','宜蘭縣','新竹縣','苗栗縣',

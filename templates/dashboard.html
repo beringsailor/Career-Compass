@@ -36,7 +36,10 @@
         </div>
     </div>
 
-    <div class="flex-container">
+    <div id="loadingIndicator" style="display: block; text-align: center;">
+        <img src="{{ url_for('static', filename='loading.gif') }}" alt="Loading..." style="width: 100px; height: 100px;" />
+    </div>
+    <div id="chartDiv" style="display: none;" class="flex-container">
         <div class="flex-container-2">
             <div class="flex-container-1">
                 <h3 id="region-heading">台灣各縣市薪水平均值</h3>
